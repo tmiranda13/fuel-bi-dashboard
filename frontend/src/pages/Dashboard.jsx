@@ -1,8 +1,5 @@
-/**
- * Dashboard Page - With Tab Navigation
- * Includes Vendas, Compras, Estoque, and Metas tabs
- */
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Container, Nav, Navbar, Tab, Tabs } from 'react-bootstrap';
 import { useAuth } from '../App';
 import Vendas from '../components/tabs/Vendas';
@@ -13,6 +10,7 @@ import Metas from '../components/tabs/Metas';
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('vendas');
   const { profile, companyName, userName, logout, isManager, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
@@ -21,15 +19,13 @@ export default function Dashboard() {
       console.error('Logout error:', err);
     }
     localStorage.clear();
-    window.location.href = '/login';
+    navigate('/login');
   };
 
-  // Check if user has manager or super_admin role
   const isManagerOrAdmin = isManager || isSuperAdmin;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
-      {/* Top Navigation Bar */}
       <Navbar bg="dark" variant="dark" expand="lg" className="mb-4">
         <Container fluid>
           <Navbar.Brand href="#home">
@@ -52,7 +48,6 @@ export default function Dashboard() {
         </Container>
       </Navbar>
 
-      {/* Main Content with Tabs */}
       <Container fluid className="px-4">
         <Tabs
           id="dashboard-tabs"
