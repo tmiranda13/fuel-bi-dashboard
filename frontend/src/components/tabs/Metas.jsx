@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, memo } from 'react'
 import { Row, Col, Card, Badge, Form, Button, Table, Alert, Spinner } from 'react-bootstrap'
 import { sortProductsByStandardOrder, PRODUCT_ORDER, PRODUCT_NAMES } from '../../services/dashboardApi'
 import { kpisService } from '../../services/dataService'
-import { supabase } from '../../services/supabase'
 
 // Input cell component
 const InputCell = memo(({ kpiType, productCode, unit, value, onChange, placeholder, existingKpi }) => {
@@ -36,13 +35,20 @@ const Metas = () => {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
-  // Current month for default period
+  // Month/Year selection
   const now = new Date()
-  const currentYear = now.getFullYear()
-  const currentMonth = now.getMonth()
-  const startOfMonth = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`
-  const endOfMonth = new Date(currentYear, currentMonth + 1, 0)
-  const endOfMonthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(endOfMonth.getDate()).padStart(2, '0')}`
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth())
+
+  // Calculate start/end of selected month
+  const getMonthDates = (year, month) => {
+    const startOfMonth = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const endOfMonth = new Date(year, month + 1, 0)
+    const endOfMonthStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(endOfMonth.getDate()).padStart(2, '0')}`
+    return { startOfMonth, endOfMonthStr }
+  }
+
+  const { startOfMonth, endOfMonthStr } = getMonthDates(selectedYear, selectedMonth)
 
   // KPI types for configuration
   const kpiTypes = [
@@ -56,10 +62,18 @@ const Metas = () => {
   const [editValues, setEditValues] = useState({})
   const [modifiedKeys, setModifiedKeys] = useState(new Set())
 
+  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+  // Generate year options (current year - 1 to current year + 2)
+  const yearOptions = []
+  for (let y = now.getFullYear() - 1; y <= now.getFullYear() + 2; y++) {
+    yearOptions.push(y)
+  }
+
   // Fetch products - use standard product list
   const fetchProducts = async () => {
     try {
-      // Use the standard product order
       const productList = PRODUCT_ORDER.map(code => ({
         product_code: code,
         product_name: PRODUCT_NAMES[code]
@@ -70,18 +84,25 @@ const Metas = () => {
     }
   }
 
-  // Fetch KPIs from Supabase
+  // Fetch KPIs from Supabase filtered by selected month
   const fetchKpis = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      const data = await kpisService.getKpis('active')
-      setKpis(data || [])
+      const allKpis = await kpisService.getKpis('active')
+      
+      // Filter KPIs by selected month's start_date
+      const filteredKpis = (allKpis || []).filter(kpi => {
+        if (!kpi.start_date) return false
+        return kpi.start_date === startOfMonth
+      })
 
-      // Initialize edit values from existing KPIs
+      setKpis(filteredKpis)
+
+      // Initialize edit values from existing KPIs for this month
       const values = {}
-      ;(data || []).forEach(kpi => {
+      filteredKpis.forEach(kpi => {
         const key = `${kpi.kpi_type}_${kpi.product_code || 'total'}`
         values[key] = kpi.target_value
       })
@@ -97,8 +118,12 @@ const Metas = () => {
   // Initial load
   useEffect(() => {
     fetchProducts()
-    fetchKpis()
   }, [])
+
+  // Reload KPIs when month/year changes
+  useEffect(() => {
+    fetchKpis()
+  }, [selectedYear, selectedMonth])
 
   // Get KPI key for a cell
   const getKpiKey = (kpiType, productCode) => `${kpiType}_${productCode || 'total'}`
@@ -125,12 +150,9 @@ const Metas = () => {
     const kpiTypeInfo = kpiTypes.find(t => t.value === kpiType)
     const product = products.find(p => p.product_code === productCode)
 
-    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-
     const kpiName = productCode && productCode !== 'total'
-      ? `${kpiTypeInfo.label} - ${product?.product_name || productCode} (${monthNames[currentMonth]}/${currentYear})`
-      : `${kpiTypeInfo.label} - Total (${monthNames[currentMonth]}/${currentYear})`
+      ? `${kpiTypeInfo.label} - ${product?.product_name || productCode} (${monthNames[selectedMonth]}/${selectedYear})`
+      : `${kpiTypeInfo.label} - Total (${monthNames[selectedMonth]}/${selectedYear})`
 
     const payload = {
       kpi_name: kpiName,
@@ -208,6 +230,40 @@ const Metas = () => {
     }
   }
 
+  // Copy from another month
+  const handleCopyFromMonth = async (sourceYear, sourceMonth) => {
+    try {
+      setLoading(true)
+      const allKpis = await kpisService.getKpis('active')
+      const { startOfMonth: sourceStart } = getMonthDates(sourceYear, sourceMonth)
+      
+      const sourceKpis = (allKpis || []).filter(kpi => kpi.start_date === sourceStart)
+      
+      if (sourceKpis.length === 0) {
+        setError(`Nenhuma meta encontrada em ${monthNames[sourceMonth]}/${sourceYear}`)
+        return
+      }
+
+      // Copy values to edit state
+      const values = { ...editValues }
+      const newModified = new Set(modifiedKeys)
+      
+      sourceKpis.forEach(kpi => {
+        const key = `${kpi.kpi_type}_${kpi.product_code || 'total'}`
+        values[key] = kpi.target_value
+        newModified.add(key)
+      })
+      
+      setEditValues(values)
+      setModifiedKeys(newModified)
+      setSuccess(`${sourceKpis.length} meta(s) copiada(s) de ${monthNames[sourceMonth]}/${sourceYear}. Clique em Salvar para confirmar.`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Format placeholder
   const getPlaceholder = (kpiType) => {
     const type = kpiTypes.find(t => t.value === kpiType)
@@ -218,7 +274,7 @@ const Metas = () => {
   }
 
   // Loading state
-  if (loading && kpis.length === 0) {
+  if (loading && kpis.length === 0 && Object.keys(editValues).length === 0) {
     return (
       <div className="text-center py-5">
         <Spinner animation="border" role="status">
@@ -228,9 +284,6 @@ const Metas = () => {
       </div>
     )
   }
-
-  const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-                     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 
   const renderInputCell = (kpiType, productCode, unit) => {
     const key = getKpiKey(kpiType, productCode)
@@ -252,17 +305,64 @@ const Metas = () => {
     )
   }
 
+  // Previous month for copy feature
+  const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1
+  const prevYear = selectedMonth === 0 ? selectedYear - 1 : selectedYear
+
   return (
     <div>
-      {/* Header */}
+      {/* Header with Month/Year Selector */}
       <Row className="mb-4 align-items-center">
-        <Col>
-          <h2>Configurar Metas - {monthNames[currentMonth]} {currentYear}</h2>
+        <Col md={6}>
+          <h2>Configurar Metas</h2>
           <p className="text-muted mb-0">
             Configure as metas mensais por produto. Deixe em branco para ignorar.
           </p>
         </Col>
-        <Col xs="auto">
+        <Col md={6}>
+          <Row className="align-items-center justify-content-end">
+            <Col xs="auto">
+              <Form.Group className="d-flex align-items-center gap-2">
+                <Form.Label className="mb-0 fw-bold">Mês:</Form.Label>
+                <Form.Select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                  style={{ width: '140px' }}
+                >
+                  {monthNames.map((month, index) => (
+                    <option key={index} value={index}>{month}</option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col xs="auto">
+              <Form.Group className="d-flex align-items-center gap-2">
+                <Form.Label className="mb-0 fw-bold">Ano:</Form.Label>
+                <Form.Select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  style={{ width: '100px' }}
+                >
+                  {yearOptions.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+        </Col>
+      </Row>
+
+      {/* Action Buttons Row */}
+      <Row className="mb-4">
+        <Col className="d-flex gap-2 justify-content-end">
+          <Button
+            variant="outline-secondary"
+            onClick={() => handleCopyFromMonth(prevYear, prevMonth)}
+            disabled={loading}
+          >
+            Copiar de {monthNames[prevMonth]}/{prevYear}
+          </Button>
           <Button
             variant="success"
             size="lg"
@@ -271,6 +371,25 @@ const Metas = () => {
           >
             {saving ? 'Salvando...' : modifiedKeys.size > 0 ? `Salvar ${modifiedKeys.size} Meta(s)` : 'Nenhuma Alteração'}
           </Button>
+        </Col>
+      </Row>
+
+      {/* Current Period Badge */}
+      <Row className="mb-3">
+        <Col>
+          <Badge bg="primary" className="fs-6 p-2">
+            Período: {monthNames[selectedMonth]} {selectedYear}
+          </Badge>
+          {kpis.length > 0 && (
+            <Badge bg="success" className="fs-6 p-2 ms-2">
+              {kpis.length} meta(s) salva(s) neste mês
+            </Badge>
+          )}
+          {kpis.length === 0 && (
+            <Badge bg="warning" text="dark" className="fs-6 p-2 ms-2">
+              Nenhuma meta configurada para este mês
+            </Badge>
+          )}
         </Col>
       </Row>
 
@@ -381,11 +500,11 @@ const Metas = () => {
         </Col>
       </Row>
 
-      {/* Summary of saved KPIs */}
+      {/* Summary of saved KPIs for this month */}
       {kpis.length > 0 && (
         <Card className="bg-light">
           <Card.Body>
-            <h6>Metas Salvas: {kpis.length}</h6>
+            <h6>Metas Salvas para {monthNames[selectedMonth]} {selectedYear}: {kpis.length}</h6>
             <div className="d-flex flex-wrap gap-2">
               {kpis.map(kpi => (
                 <Badge key={kpi.id} bg="secondary" className="p-2">
