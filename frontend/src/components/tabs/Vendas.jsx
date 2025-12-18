@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Row, Col, Card, Form, Table, Badge, Spinner, Alert, Button, ProgressBar } from 'react-bootstrap'
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchVendasDashboard, fetchKpis, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
@@ -39,6 +40,23 @@ const Vendas = () => {
     fetchData()
   }, [])
 
+// Calculate proration factor based on selected days vs days in month
+  const getProratedFactor = useCallback(() => {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    
+    // Days in selected range
+    const selectedDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
+    
+    // Days in the month (based on startDate month)
+    const year = start.getFullYear()
+    const month = start.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    
+    return selectedDays / daysInMonth
+  }, [startDate, endDate])
+
+  // Helper to get KPI target by type and product code
   const getKpiTarget = (kpiType, productCode = null) => {
     const kpi = kpis.find(k =>
       k.kpi_type === kpiType &&
@@ -47,6 +65,14 @@ const Vendas = () => {
     return kpi ? parseFloat(kpi.target_value) : null
   }
 
+  // Get prorated KPI target
+  const getProratedKpiTarget = (kpiType, productCode = null) => {
+    const monthlyTarget = getKpiTarget(kpiType, productCode)
+    if (!monthlyTarget) return null
+    return monthlyTarget * getProratedFactor()
+  }
+
+  // Product name to code mapping
   const productNameToCode = {
     'GASOLINA COMUM': 'GC',
     'GASOLINA ADITIVADA': 'GA',
@@ -55,29 +81,34 @@ const Vendas = () => {
     'DIESEL S500': 'DS500'
   }
 
+  // Get product code from name
   const getProductCode = (productName) => {
     if (productNameToCode[productName]) return productNameToCode[productName]
     const normalized = normalizeProductName(productName)
     return productNameToCode[normalized] || null
   }
 
+  // Get volume target for product (prorated)
   const getVolumeTarget = (productName) => {
     const code = getProductCode(productName)
-    return code ? getKpiTarget('sales_volume', code) : null
+    return code ? getProratedKpiTarget('sales_volume', code) : null
   }
 
+  // Get margin target for product (not prorated - it's a percentage)
   const getMarginTarget = (productName) => {
     const code = getProductCode(productName)
     return code ? getKpiTarget('margin', code) : null
   }
 
+  // Get mix aditivados target (not prorated - it's a percentage)
   const getMixTarget = (category) => {
     return getKpiTarget('cost', category)
   }
 
+  // Get revenue target for product (prorated)
   const getRevenueTarget = (productName) => {
     const code = getProductCode(productName)
-    return code ? getKpiTarget('revenue', code) : null
+    return code ? getProratedKpiTarget('revenue', code) : null
   }
 
   const clientesPJData = [
