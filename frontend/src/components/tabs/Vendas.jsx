@@ -542,7 +542,7 @@ const Vendas = () => {
                   <tr>
                     <th>Produto</th>
                     <th>Volume Vendido (L)</th>
-                    <th>Meta Mensal (L)</th>
+                    <th>Alvo de Volume (L)</th>
                     <th>% da Meta</th>
                     <th>Preco Medio (R$/L)</th>
                     <th>Lucro Bruto</th>
