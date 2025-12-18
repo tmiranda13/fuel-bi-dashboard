@@ -2,10 +2,8 @@ import { useState, useEffect } from 'react'
 import { Row, Col, Card, Table, Badge, Form, Spinner, Alert, Button } from 'react-bootstrap'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchEstoqueDashboard, fetchEstoqueEvolution, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
-import MockDataBadge, { MockDataCard } from '../MockDataBadge'
 
 const Estoque = () => {
-  // Initialize dates from localStorage or use defaults
   const [startDate, setStartDate] = useState(() => {
     return localStorage.getItem('estoque_startDate') || '2025-09-01'
   })
@@ -13,25 +11,21 @@ const Estoque = () => {
     return localStorage.getItem('estoque_endDate') || '2025-12-03'
   })
 
-  // API data state
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [dashboardData, setDashboardData] = useState(null)
   const [evolutionData, setEvolutionData] = useState(null)
   const [evolutionLoading, setEvolutionLoading] = useState(false)
 
-  // Fetch data from API
   const fetchData = async () => {
     try {
       setLoading(true)
       setEvolutionLoading(true)
       setError(null)
-
       const [dashboardResult, evolutionResult] = await Promise.all([
         fetchEstoqueDashboard(startDate, endDate),
         fetchEstoqueEvolution(startDate, endDate)
       ])
-
       setDashboardData(dashboardResult)
       setEvolutionData(evolutionResult)
     } catch (err) {
@@ -42,17 +36,13 @@ const Estoque = () => {
     }
   }
 
-  // Initial data load only
   useEffect(() => {
     fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Prepare evolution data for line chart (from real API data)
   const stockEvolutionData = evolutionData?.evolution?.map(day => {
     const [year, month, dayNum] = day.date.split('-')
     const formattedDate = `${dayNum}/${month}`
-
     return {
       dia: formattedDate,
       fullDate: day.date,
@@ -65,28 +55,18 @@ const Estoque = () => {
     }
   }) || []
 
-  // Custom Tooltip to show day of week
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const fullDate = payload[0]?.payload?.fullDate
-
       let dayOfWeek = ''
       if (fullDate) {
         const date = new Date(fullDate + 'T00:00:00')
         const daysOfWeek = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
         dayOfWeek = daysOfWeek[date.getDay()]
       }
-
       return (
-        <div style={{
-          backgroundColor: 'white',
-          padding: '10px',
-          border: '1px solid #ccc',
-          borderRadius: '4px'
-        }}>
-          <p style={{ margin: 0, fontWeight: 'bold', marginBottom: '8px' }}>
-            {dayOfWeek && `${dayOfWeek}, `}{label}
-          </p>
+        <div style={{ backgroundColor: 'white', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}>
+          <p style={{ margin: 0, fontWeight: 'bold', marginBottom: '8px' }}>{dayOfWeek && `${dayOfWeek}, `}{label}</p>
           {payload.map((entry, index) => (
             <p key={index} style={{ margin: '4px 0', color: entry.color }}>
               {entry.name}: {entry.value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} L
@@ -100,18 +80,13 @@ const Estoque = () => {
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'critico':
-        return <Badge bg="danger">Crítico</Badge>
-      case 'baixo':
-        return <Badge bg="warning" text="dark">Baixo</Badge>
-      case 'adequado':
-        return <Badge bg="success">Adequado</Badge>
-      default:
-        return <Badge bg="secondary">N/A</Badge>
+      case 'critico': return <Badge bg="danger">Crítico</Badge>
+      case 'baixo': return <Badge bg="warning" text="dark">Baixo</Badge>
+      case 'adequado': return <Badge bg="success">Adequado</Badge>
+      default: return <Badge bg="secondary">N/A</Badge>
     }
   }
 
-  // Loading state
   if (loading) {
     return (
       <div className="text-center py-5">
@@ -123,7 +98,6 @@ const Estoque = () => {
     )
   }
 
-  // Error state
   if (error) {
     return (
       <Alert variant="danger">
@@ -133,7 +107,6 @@ const Estoque = () => {
     )
   }
 
-  // No data state
   if (!dashboardData || !dashboardData.inventory) {
     return (
       <Alert variant="info">
@@ -143,20 +116,17 @@ const Estoque = () => {
     )
   }
 
-  // Helper function to determine status based on tank occupation %
   const getStatusFromOccupation = (percentOccupation) => {
     if (percentOccupation >= 70) return 'adequado'
     if (percentOccupation >= 40) return 'baixo'
     return 'critico'
   }
 
-  // Prepare stock data from API (sorted by standard product order)
   const sortedInventory = sortProductsByStandardOrder(dashboardData.inventory, 'product_code')
   const estoqueData = sortedInventory.map((item, index) => {
     const capacidadeTanque = parseFloat(item.tank_capacity || 0)
     const estoqueAtual = parseFloat(item.current_stock)
     const percentualOcupacao = capacidadeTanque > 0 ? (estoqueAtual / capacidadeTanque * 100) : 0
-
     return {
       id: index + 1,
       produto: normalizeProductName(item.product_name),
@@ -172,12 +142,9 @@ const Estoque = () => {
     }
   })
 
-  // Calculate total stock cost
   const totalCustoEstoque = estoqueData.reduce((sum, item) => sum + item.custoEstoque, 0)
-
   return (
     <div>
-      {/* Header with Filters */}
       <div className="mb-4">
         <Row className="align-items-center mb-3">
           <Col md={3}>
@@ -214,12 +181,7 @@ const Estoque = () => {
                 </Form.Group>
               </Col>
               <Col md={2} className="d-flex align-items-end">
-                <Button
-                  variant="primary"
-                  className="w-100"
-                  onClick={fetchData}
-                  disabled={loading}
-                >
+                <Button variant="primary" className="w-100" onClick={fetchData} disabled={loading}>
                   {loading ? 'Carregando...' : 'Atualizar'}
                 </Button>
               </Col>
@@ -227,14 +189,9 @@ const Estoque = () => {
                 <Card bg="success" text="white" className="border-success">
                   <Card.Body className="py-2">
                     <div className="d-flex justify-content-between align-items-center">
-                      <span className="fs-6">
-                        Custo Total Estoque:
-                      </span>
+                      <span className="fs-6">Custo Total Estoque:</span>
                       <span className="fs-5 fw-bold">
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        }).format(totalCustoEstoque)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCustoEstoque)}
                       </span>
                     </div>
                   </Card.Body>
@@ -245,15 +202,11 @@ const Estoque = () => {
         </Row>
       </div>
 
-      {/* Stock Status Table */}
       <Row className="mb-4">
         <Col lg={12}>
           <Card className="border-success">
             <Card.Body>
-              <Card.Title>
-                Status de Estoque por Produto
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
+              <Card.Title>Status de Estoque por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
               <p className="small text-muted mb-3">
                 Entrada e Saída referem-se ao período selecionado. Custo calculado com base no custo médio ponderado das compras.
               </p>
@@ -276,12 +229,8 @@ const Estoque = () => {
                   {estoqueData.map(item => (
                     <tr key={item.id} className={item.status === 'critico' ? 'table-danger' : item.status === 'baixo' ? 'table-warning' : ''}>
                       <td><strong>{item.produto}</strong></td>
-                      <td>
-                        <strong className="text-success">{Math.round(item.capacidadeTanque).toLocaleString('pt-BR')}</strong>
-                      </td>
-                      <td>
-                        <strong className="text-success">{Math.round(item.estoqueAtual).toLocaleString('pt-BR')}</strong>
-                      </td>
+                      <td><strong className="text-success">{Math.round(item.capacidadeTanque).toLocaleString('pt-BR')}</strong></td>
+                      <td><strong className="text-success">{Math.round(item.estoqueAtual).toLocaleString('pt-BR')}</strong></td>
                       <td>
                         <div className="d-flex align-items-center">
                           <div className="progress" style={{ height: '13px', width: '33px' }}>
@@ -291,31 +240,14 @@ const Estoque = () => {
                               style={{ width: `${Math.min(item.percentualOcupacao, 100)}%` }}
                             />
                           </div>
-                          <span className="ms-1 fw-bold" style={{ fontSize: '0.85em' }}>
-                            {item.percentualOcupacao.toFixed(0)}%
-                          </span>
+                          <span className="ms-1 fw-bold" style={{ fontSize: '0.85em' }}>{item.percentualOcupacao.toFixed(0)}%</span>
                         </div>
                       </td>
-                      <td>
-                        <strong className="text-success">{Math.round(item.entradas).toLocaleString('pt-BR')}</strong>
-                      </td>
-                      <td>
-                        <strong className="text-success">{Math.round(item.saidas).toLocaleString('pt-BR')}</strong>
-                      </td>
-                      <td>
-                        <strong className="text-success">{item.diasAutonomia.toFixed(1)} dias</strong>
-                      </td>
-                      <td>
-                        <strong className="text-success">R$ {item.custoMedio.toFixed(2)}/L</strong>
-                      </td>
-                      <td>
-                        <strong className="text-success">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL'
-                          }).format(item.custoEstoque)}
-                        </strong>
-                      </td>
+                      <td><strong className="text-success">{Math.round(item.entradas).toLocaleString('pt-BR')}</strong></td>
+                      <td><strong className="text-success">{Math.round(item.saidas).toLocaleString('pt-BR')}</strong></td>
+                      <td><strong className="text-success">{item.diasAutonomia.toFixed(1)} dias</strong></td>
+                      <td><strong className="text-success">R$ {item.custoMedio.toFixed(2)}/L</strong></td>
+                      <td><strong className="text-success">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.custoEstoque)}</strong></td>
                       <td>{getStatusBadge(item.status)}</td>
                     </tr>
                   ))}
@@ -326,15 +258,11 @@ const Estoque = () => {
         </Col>
       </Row>
 
-      {/* Evolution Chart - Real Data */}
       <Row className="mb-4">
         <Col lg={12}>
           <Card className="border-success">
             <Card.Body>
-              <Card.Title>
-                Evolução de Estoque
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
+              <Card.Title>Evolução de Estoque <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
               <p className="small text-muted mb-3">
                 Estoque diário calculado a partir das compras (entradas) e vendas (saídas).
                 O estoque atual é baseado na medição física dos tanques.
@@ -361,22 +289,18 @@ const Estoque = () => {
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <Alert variant="info">
-                  Nenhum dado de evolução disponível para o período selecionado.
-                </Alert>
+                <Alert variant="info">Nenhum dado de evolução disponível para o período selecionado.</Alert>
               )}
             </Card.Body>
           </Card>
         </Col>
       </Row>
 
-      {/* Alerts Section - Real Data */}
       <Row className="mb-4">
         <Col lg={12}>
           <Card border={estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length > 0 ? 'danger' : 'success'}>
             <Card.Header className={estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length > 0 ? 'bg-danger text-white' : 'bg-success text-white'}>
-              <strong>Alertas de Estoque</strong>
-              <small className="ms-2">✓ Dados Reais</small>
+              <strong>Alertas de Estoque</strong> <small className="ms-2">✓ Dados Reais</small>
             </Card.Header>
             <Card.Body>
               {estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length === 0 ? (
@@ -401,7 +325,6 @@ const Estoque = () => {
         </Col>
       </Row>
 
-      {/* Legend Card */}
       <Card bg="light" className="mt-3">
         <Card.Body>
           <Row>
@@ -432,17 +355,13 @@ const Estoque = () => {
           <hr />
           <Row>
             <Col md={12}>
-              <Card.Text className="text-muted mb-2">
-                <strong>Legenda de Status (baseado em ocupação do tanque):</strong>
-              </Card.Text>
+              <p className="text-muted mb-2"><strong>Legenda de Status (baseado em ocupação do tanque):</strong></p>
               <ul className="mb-0 text-muted">
                 <li><strong className="text-danger">Crítico:</strong> Menos de 40% de ocupação - Compra urgente!</li>
                 <li><strong className="text-warning">Baixo:</strong> Entre 40% e 70% de ocupação - Programar compra</li>
                 <li><strong className="text-success">Adequado:</strong> Acima de 70% de ocupação - Estoque normal</li>
               </ul>
-              <Card.Text className="text-muted mt-3 mb-0">
-                <strong>Cálculo:</strong> Ocupação = Estoque Atual / Capacidade do Tanque
-              </Card.Text>
+              <p className="text-muted mt-3 mb-0"><strong>Cálculo:</strong> Ocupação = Estoque Atual / Capacidade do Tanque</p>
             </Col>
           </Row>
         </Card.Body>
