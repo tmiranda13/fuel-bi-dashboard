@@ -65,9 +65,9 @@ async function getAverageCosts() {
   try {
     const purchases = await purchasesService.getPurchases(null, null)
     const costsByProduct = {}
-    
+
     purchases.forEach(p => {
-      const code = p.canonical_product_code || p.product_code
+      const code = p.canonical_product_code || getProductCode(p.product_name) || p.product_code
       if (!code) return
       if (!costsByProduct[code]) {
         costsByProduct[code] = { totalCost: 0, totalVolume: 0 }
@@ -77,7 +77,7 @@ async function getAverageCosts() {
       costsByProduct[code].totalCost += cost
       costsByProduct[code].totalVolume += volume
     })
-    
+
     const avgCosts = {}
     Object.entries(costsByProduct).forEach(([code, data]) => {
       avgCosts[code] = data.totalVolume > 0 ? data.totalCost / data.totalVolume : 0
@@ -95,24 +95,31 @@ export async function fetchVendasDashboard(startDate, endDate) {
     kpisService.getKpis(),
     getAverageCosts()
   ])
-  
+
   const salesByProduct = {}
   sales.forEach(sale => {
-    const code = sale.product_code
-    if (!code) return
-    if (!salesByProduct[code]) {
-      salesByProduct[code] = {
-        product_code: code,
-        product_name: sale.product_name || PRODUCT_NAMES[code],
+    // Use canonical code for grouping, but preserve original data
+    const canonicalCode = getProductCode(sale.product_name) || sale.product_code
+    if (!canonicalCode) return
+
+    if (!salesByProduct[canonicalCode]) {
+      salesByProduct[canonicalCode] = {
+        product_code: canonicalCode,
+        original_codes: new Set(),
+        product_name: sale.product_name || PRODUCT_NAMES[canonicalCode],
         volume: 0,
         revenue: 0
       }
     }
-    salesByProduct[code].volume += parseFloat(sale.volume_sold || 0)
-    salesByProduct[code].revenue += parseFloat(sale.total_revenue || 0)
+    // Track all original codes that map to this canonical code
+    salesByProduct[canonicalCode].original_codes.add(sale.product_code)
+    salesByProduct[canonicalCode].volume += parseFloat(sale.volume_sold || 0)
+    salesByProduct[canonicalCode].revenue += parseFloat(sale.total_revenue || 0)
   })
-  
+
   const products = Object.values(salesByProduct).map(p => {
+    // Convert Set to Array for JSON serialization
+    const originalCodes = Array.from(p.original_codes || [])
     const volume = p.volume
     const revenue = p.revenue
     const avgPrice = volume > 0 ? revenue / volume : 0
@@ -120,9 +127,10 @@ export async function fetchVendasDashboard(startDate, endDate) {
     const grossProfit = (avgPrice - avgCost) * volume
     const marginPercent = revenue > 0 ? (grossProfit / revenue) * 100 : 0
     const marginPerLiter = volume > 0 ? grossProfit / volume : 0
-    
+
     return {
       product_code: p.product_code,
+      original_codes: originalCodes,
       product_name: normalizeProductName(p.product_name) || PRODUCT_NAMES[p.product_code],
       volume_sold: volume,
       revenue: revenue,
@@ -134,28 +142,28 @@ export async function fetchVendasDashboard(startDate, endDate) {
       avg_cost: avgCost
     }
   })
-  
+
   const totals = products.reduce((acc, p) => ({
     totalVolume: acc.totalVolume + p.volume_sold,
     totalRevenue: acc.totalRevenue + p.revenue,
     totalCogs: acc.totalCogs + p.cogs,
     totalProfit: acc.totalProfit + p.gross_profit
   }), { totalVolume: 0, totalRevenue: 0, totalCogs: 0, totalProfit: 0 })
-  
+
   totals.marginPercent = totals.totalRevenue > 0 ? (totals.totalProfit / totals.totalRevenue) * 100 : 0
   totals.marginPerLiter = totals.totalVolume > 0 ? totals.totalProfit / totals.totalVolume : 0
-  
+
   const volumeByProduct = {}
   products.forEach(p => { volumeByProduct[p.product_code] = p.volume_sold })
-  
+
   const totalGasolina = (volumeByProduct.GC || 0) + (volumeByProduct.GA || 0)
   const gasolinaAditivadaMix = totalGasolina > 0 ? ((volumeByProduct.GA || 0) / totalGasolina) * 100 : 0
-  
+
   const totalDiesel = (volumeByProduct.DS10 || 0) + (volumeByProduct.DS500 || 0)
   const dieselS10Mix = totalDiesel > 0 ? ((volumeByProduct.DS10 || 0) / totalDiesel) * 100 : 0
-  
+
   const evolution = await salesService.getDailyEvolution(startDate, endDate)
-  
+
   return {
     start_date: startDate,
     end_date: endDate,
@@ -180,18 +188,18 @@ export async function fetchComprasDashboard(startDate, endDate) {
     purchasesService.getPurchasesEvolution(startDate, endDate),
     kpisService.getKpis()
   ])
-  
+
   const totals = productData.reduce((acc, p) => ({
     volume: acc.volume + p.volume,
     cost: acc.cost + p.total_cost
   }), { volume: 0, cost: 0 })
-  
+
   const products = productData.map(p => ({
     ...p,
     product_code: p.product_code || getProductCode(p.product_name),
     product_name: normalizeProductName(p.product_name)
   }))
-  
+
   return {
     start_date: startDate,
     end_date: endDate,
@@ -214,27 +222,27 @@ export async function fetchEstoqueDashboard(startDate, endDate) {
     purchasesService.getPurchases(startDate, endDate),
     getAverageCosts()
   ])
-  
+
   const entriesByProduct = {}
   purchases.forEach(p => {
-    const code = p.canonical_product_code || p.product_code
+    const code = p.canonical_product_code || getProductCode(p.product_name) || p.product_code
     if (!code) return
     if (!entriesByProduct[code]) entriesByProduct[code] = 0
     entriesByProduct[code] += parseFloat(p.quantity || 0)
   })
-  
+
   const exitsByProduct = {}
   sales.forEach(s => {
-    const code = s.product_code
+    const code = getProductCode(s.product_name) || s.product_code
     if (!code) return
     if (!exitsByProduct[code]) exitsByProduct[code] = 0
     exitsByProduct[code] += parseFloat(s.volume_sold || 0)
   })
-  
+
   const start = new Date(startDate)
   const end = new Date(endDate)
   const daysDiff = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1)
-  
+
   const inventory = tankLevels.map(tank => {
     const code = tank.product_code
     const currentStock = parseFloat(tank.current_stock || 0)
@@ -245,7 +253,7 @@ export async function fetchEstoqueDashboard(startDate, endDate) {
     const vmd = exits / daysDiff
     const daysAutonomy = vmd > 0 ? currentStock / vmd : 0
     const stockCost = currentStock * avgCost
-    
+
     return {
       product_code: code,
       product_name: normalizeProductName(tank.product_name),
@@ -261,9 +269,9 @@ export async function fetchEstoqueDashboard(startDate, endDate) {
       avg_cost: avgCost
     }
   })
-  
+
   const totalStockCost = inventory.reduce((sum, i) => sum + (i.stock_cost || 0), 0)
-  
+
   return {
     start_date: startDate,
     end_date: endDate,
@@ -319,6 +327,7 @@ export default {
   getKpiTarget,
   sortProductsByStandardOrder,
   normalizeProductName,
+  getProductCode,
   formatCurrency,
   formatVolume,
   formatPercent,
