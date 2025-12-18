@@ -299,12 +299,20 @@ export const kpisService = {
   },
   
   async createKpi(kpiData) {
+    // Get company_id from JWT
+    const { data: { session } } = await supabase.auth.getSession()
+    const companyId = session?.user?.app_metadata?.company_id
+
+    if (!companyId) {
+      throw new Error('Company ID not found in session')
+    }
+
     const { data, error } = await supabase
       .from('kpis')
-      .insert(kpiData)
+      .insert({ ...kpiData, company_id: companyId })
       .select()
       .single()
-    
+
     if (error) throw error
     return data
   },
