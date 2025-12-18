@@ -33,10 +33,14 @@ export default function Dashboard() {
           </Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
-            <Nav className="ms-auto">
-              <Nav.Link className="text-light me-3">
-                {companyName || 'Dashboard'}
+            {/* Center - Gas Station Name */}
+            <Nav className="mx-auto">
+              <Nav.Link className="text-warning fw-bold" style={{ fontSize: '1.1rem' }}>
+                {companyName || 'Posto'}
               </Nav.Link>
+            </Nav>
+            {/* Right - User and Logout */}
+            <Nav>
               <Nav.Link className="text-light me-3">
                 {userName || profile?.email}
               </Nav.Link>
