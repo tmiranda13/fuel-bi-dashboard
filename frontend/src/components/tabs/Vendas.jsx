@@ -54,7 +54,6 @@ const Vendas = () => {
   }
 
   // Helper to get KPI for a product name (maps product name to code)
-  // Note: EA (Etanol Aditivado) excluded - this company doesn't sell it
   const productNameToCode = {
     'GASOLINA COMUM': 'GC',
     'GASOLINA ADITIVADA': 'GA',
@@ -65,37 +64,29 @@ const Vendas = () => {
 
   // Get product code from name (handles normalized names)
   const getProductCode = (productName) => {
-    // Try direct match first
     if (productNameToCode[productName]) return productNameToCode[productName]
-    // Try normalized version
     const normalized = normalizeProductName(productName)
     return productNameToCode[normalized] || null
   }
 
   // Get volume target for product (from KPIs or null)
-  // KPI type in database: 'sales_volume'
   const getVolumeTarget = (productName) => {
     const code = getProductCode(productName)
-    // Only return if we have a valid product code, otherwise null (not total)
     return code ? getKpiTarget('sales_volume', code) : null
   }
 
   // Get margin target for product
-  // KPI type in database: 'margin'
   const getMarginTarget = (productName) => {
     const code = getProductCode(productName)
-    // Only return if we have a valid product code, otherwise null (not total)
     return code ? getKpiTarget('margin', code) : null
   }
 
   // Get mix aditivados target
-  // KPI type in database: 'cost' (repurposed for mix %)
   const getMixTarget = (category) => {
     return getKpiTarget('cost', category)
   }
 
   // Get revenue (lucro bruto) target for product
-  // KPI type in database: 'revenue'
   const getRevenueTarget = (productName) => {
     const code = getProductCode(productName)
     return code ? getKpiTarget('revenue', code) : null
@@ -257,13 +248,12 @@ const Vendas = () => {
 
   // Prepare evolution data for line chart
   const volumeDataPerProduct = dashboardData.evolution?.map(day => {
-    // Parse date manually to avoid timezone offset issues
     const [year, month, dayNum] = day.date.split('-')
     const formattedDate = `${dayNum}/${month}`
 
     return {
       dia: formattedDate,
-      fullDate: day.date, // Keep full date for tooltip
+      fullDate: day.date,
       gasolinaComum: parseFloat(day.GC || 0),
       gasolinaAditivada: parseFloat(day.GA || 0),
       etanol: parseFloat(day.ET || 0),
@@ -274,7 +264,7 @@ const Vendas = () => {
   }) || []
 
   // Calculate MTD (Month-To-Date) average volume
-  const numberOfDays = dashboardData.evolution?.length || 0
+  const numberOfDays = dashboardData.evolution?.length || 1
   const volumeMedioMTD = numberOfDays > 0
     ? dashboardData.total_volume / numberOfDays
     : 0
@@ -297,10 +287,14 @@ const Vendas = () => {
     // Calculate gross profit: (Sale Price - Cost Price) * Volume
     const lucroBruto = (precoMedio - custoMedio) * volumeVendido
 
+    // Calculate VMD for this product
+    const vmd = volumeVendido / numberOfDays
+
     return {
       id: index + 1,
       produto: normalizeProductName(product.product_name),
       volumeVendido: volumeVendido,
+      vmd: vmd,
       precoMedio: precoMedio,
       lucroBruto: lucroBruto,
       margemBruta: margemBruta,
@@ -315,13 +309,11 @@ const Vendas = () => {
   // Custom Tooltip to show day of week
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-      // Get the full date from the first payload item
       const fullDate = payload[0]?.payload?.fullDate
 
-      // Calculate day of week
       let dayOfWeek = ''
       if (fullDate) {
-        const date = new Date(fullDate + 'T00:00:00') // Add time to avoid timezone issues
+        const date = new Date(fullDate + 'T00:00:00')
         const daysOfWeek = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
         dayOfWeek = daysOfWeek[date.getDay()]
       }
@@ -542,6 +534,7 @@ const Vendas = () => {
                   <tr>
                     <th>Produto</th>
                     <th>Volume Vendido (L)</th>
+                    <th>VMD (L)</th>
                     <th>Alvo de Volume (L)</th>
                     <th>% da Meta</th>
                     <th>Preco Medio (R$/L)</th>
@@ -558,6 +551,7 @@ const Vendas = () => {
                       <tr key={item.id} className={rowClass}>
                         <td><strong>{item.produto}</strong></td>
                         <td>{Math.round(item.volumeVendido).toLocaleString('pt-BR')} L</td>
+                        <td>{Math.round(item.vmd).toLocaleString('pt-BR')} L</td>
                         <td>
                           {item.metaVolume ? `${item.metaVolume.toLocaleString('pt-BR')} L` : <span className="text-muted">-</span>}
                         </td>
@@ -723,207 +717,3 @@ const Vendas = () => {
                 </Col>
                 <Col md={3}>
                   <div className="text-center">
-                    <div className="text-muted small">Gasolina Aditivada</div>
-                    <div className="fs-3 fw-bold text-success">{mixGasolinaAditivada}%</div>
-                    <div className="small text-muted">{Math.round(gasolinaAditivadaTotal).toLocaleString('pt-BR')} L</div>
-                  </div>
-                </Col>
-                <Col md={3}>
-                  <div className="text-center">
-                    <div className="text-muted small">Total Gasolinas</div>
-                    <div className="fs-4 fw-bold">{Math.round(gasolinaTotal).toLocaleString('pt-BR')} L</div>
-                  </div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Charts - Real Data */}
-      <Row className="mb-4">
-        <Col lg={12} className="mb-3">
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>
-                Evolução de Volume Diário
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={volumeDataPerProduct}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="dia" />
-                  <YAxis />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-                  <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />
-                  <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />
-                  <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />
-                  <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />
-                  <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />
-                  <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      <Row className="mb-4">
-        <Col lg={8} className="mb-3">
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>
-                Breakdown por Produto
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={productBreakdown}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry) => `${entry.name}: ${((entry.value / totalVolume) * 100).toFixed(1)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {productBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col lg={4} className="mb-3">
-          <Card className="h-100 border-success">
-            <Card.Body>
-              <Card.Title>
-                Volume por Produto
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
-              <Table size="sm" className="mb-0">
-                <tbody>
-                  {productBreakdown.map((item, index) => (
-                    <tr key={index}>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            width: '12px',
-                            height: '12px',
-                            backgroundColor: item.color,
-                            marginRight: '8px',
-                            borderRadius: '2px'
-                          }}
-                        ></span>
-                        {item.name}
-                      </td>
-                      <td className="text-end">
-                        <strong>{Math.round(item.value).toLocaleString('pt-BR')} L</strong>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* PJ Customers Table - Mock Data */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <MockDataCard title="Clientes Pessoa Jurídica (PJ)">
-            <p className="small text-muted mb-3">
-              Estes dados são simulados - não há tracking de clientes no banco de dados atual.
-              Considere adicionar uma tabela de clientes para habilitar este recurso.
-            </p>
-            <Row className="mb-3">
-              <Col md={6}>
-                <Form.Control
-                  type="text"
-                  placeholder="Buscar por Razão Social ou CNPJ..."
-                  value={customerFilter}
-                  onChange={(e) => setCustomerFilter(e.target.value)}
-                />
-              </Col>
-            </Row>
-            <Table responsive hover>
-              <thead>
-                <tr>
-                  <th>Razão Social</th>
-                  <th>CNPJ</th>
-                  <th>Produto Principal</th>
-                  <th>Volume Mês (L)</th>
-                  <th>Faturamento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClientes.length > 0 ? (
-                  filteredClientes.map(cliente => (
-                    <tr key={cliente.id}>
-                      <td><strong>{cliente.razaoSocial}</strong></td>
-                      <td>{cliente.cnpj}</td>
-                      <td>
-                        <Badge bg="info">{cliente.produto}</Badge>
-                      </td>
-                      <td>{cliente.volumeMes.toLocaleString('pt-BR')} L</td>
-                      <td>
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        }).format(cliente.faturamento)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="5" className="text-center text-muted">
-                      Nenhum cliente encontrado
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </Table>
-          </MockDataCard>
-        </Col>
-      </Row>
-
-      {/* Legend */}
-      <Card bg="light" className="mt-3">
-        <Card.Body>
-          <Row>
-            <Col md={6}>
-              <h6>Dados Reais (Fonte: API)</h6>
-              <ul className="small mb-0">
-                <li>Volume Total, Faturamento, Preco Medio</li>
-                <li>Volumes por Produto</li>
-                <li>Mix de Gasolina (Comum vs Aditivada)</li>
-                <li>Evolucao Diaria de Vendas</li>
-                <li>Volume Medio MTD (Media Diaria)</li>
-                <li>Margem Bruta (Calculada)</li>
-                <li>Metas de Volume/Margem/Lucro (Aba Metas)</li>
-              </ul>
-            </Col>
-            <Col md={6}>
-              <h6>
-                <MockDataBadge /> Dados Simulados (Nao no BD)
-              </h6>
-              <ul className="small mb-0">
-                <li>Clientes PJ/PF</li>
-                <li>Volume Projetado</li>
-              </ul>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
-    </div>
-  )
-}
-
-export default Vendas

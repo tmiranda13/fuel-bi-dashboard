@@ -27,7 +27,6 @@ const Estoque = () => {
       setEvolutionLoading(true)
       setError(null)
 
-      // Fetch both dashboard and evolution data in parallel
       const [dashboardResult, evolutionResult] = await Promise.all([
         fetchEstoqueDashboard(startDate, endDate),
         fetchEstoqueEvolution(startDate, endDate)
@@ -51,13 +50,12 @@ const Estoque = () => {
 
   // Prepare evolution data for line chart (from real API data)
   const stockEvolutionData = evolutionData?.evolution?.map(day => {
-    // Parse date manually to avoid timezone offset issues
     const [year, month, dayNum] = day.date.split('-')
     const formattedDate = `${dayNum}/${month}`
 
     return {
       dia: formattedDate,
-      fullDate: day.date, // Keep full date for tooltip
+      fullDate: day.date,
       gasolinaComum: parseFloat(day.GC || 0),
       gasolinaAditivada: parseFloat(day.GA || 0),
       etanol: parseFloat(day.ET || 0),
@@ -67,16 +65,14 @@ const Estoque = () => {
     }
   }) || []
 
-  // Custom Tooltip to show day of week (same as Vendas tab)
+  // Custom Tooltip to show day of week
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-      // Get the full date from the first payload item
       const fullDate = payload[0]?.payload?.fullDate
 
-      // Calculate day of week
       let dayOfWeek = ''
       if (fullDate) {
-        const date = new Date(fullDate + 'T00:00:00') // Add time to avoid timezone issues
+        const date = new Date(fullDate + 'T00:00:00')
         const daysOfWeek = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
         dayOfWeek = daysOfWeek[date.getDay()]
       }
@@ -169,10 +165,10 @@ const Estoque = () => {
       percentualOcupacao,
       entradas: parseFloat(item.period_entries || 0),
       saidas: parseFloat(item.period_exits || 0),
-      vmd: parseFloat(item.vmd),
       diasAutonomia: parseFloat(item.days_autonomy),
       custoEstoque: parseFloat(item.stock_cost || 0),
-      status: getStatusFromOccupation(percentualOcupacao) // Status based on occupation %
+      custoMedio: parseFloat(item.avg_cost || 0),
+      status: getStatusFromOccupation(percentualOcupacao)
     }
   })
 
@@ -241,7 +237,6 @@ const Estoque = () => {
                         }).format(totalCustoEstoque)}
                       </span>
                     </div>
-                    <small className="text-success">✓ Dados Reais</small>
                   </Card.Body>
                 </Card>
               </Col>
@@ -271,8 +266,8 @@ const Estoque = () => {
                     <th style={{ width: '12%' }}>Ocupação</th>
                     <th>Entrada (L)</th>
                     <th>Saída (L)</th>
-                    <th>VMD (L)</th>
                     <th>Dias Autonomia</th>
+                    <th>Custo Médio (R$/L)</th>
                     <th>Custo Estoque</th>
                     <th>Status</th>
                   </tr>
@@ -308,10 +303,10 @@ const Estoque = () => {
                         <strong className="text-success">{Math.round(item.saidas).toLocaleString('pt-BR')}</strong>
                       </td>
                       <td>
-                        <strong className="text-success">{Math.round(item.vmd).toLocaleString('pt-BR')}</strong>
+                        <strong className="text-success">{item.diasAutonomia.toFixed(1)} dias</strong>
                       </td>
                       <td>
-                        <strong className="text-success">{item.diasAutonomia.toFixed(1)} dias</strong>
+                        <strong className="text-success">R$ {item.custoMedio.toFixed(2)}/L</strong>
                       </td>
                       <td>
                         <strong className="text-success">
@@ -418,10 +413,10 @@ const Estoque = () => {
                 <li>Ocupação % (Estoque / Capacidade)</li>
                 <li>Entrada no Período Selecionado</li>
                 <li>Saída no Período Selecionado</li>
-                <li>VMD (Volume Médio Diário)</li>
                 <li>Dias de Autonomia (Estoque / VMD)</li>
-                <li>Custo do Estoque (Custo Médio Ponderado)</li>
-                <li>Status (baseado em autonomia)</li>
+                <li>Custo Médio (R$/L)</li>
+                <li>Custo do Estoque (Custo Médio × Estoque)</li>
+                <li>Status (baseado em ocupação)</li>
                 <li>Alertas de Estoque Baixo/Crítico</li>
               </ul>
             </Col>
