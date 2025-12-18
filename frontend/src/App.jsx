@@ -1,26 +1,14 @@
-/**
- * Main App Component
- * 
- * Handles routing and authentication state using Supabase Auth
- */
-
 import { useState, useEffect, createContext, useContext } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Spinner, Container } from 'react-bootstrap'
 import { supabase } from './services/supabase'
 import { authService } from './services/auth'
 
-// Pages
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 
-// Styles
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './assets/index.css'
-
-// ============================================================
-// AUTH CONTEXT
-// ============================================================
 
 const AuthContext = createContext(null)
 
@@ -42,7 +30,6 @@ const AuthProvider = ({ children }) => {
       try {
         const session = await authService.getSession()
         setSession(session)
-        
         if (session) {
           const profile = await authService.getProfile()
           setProfile(profile)
@@ -60,7 +47,6 @@ const AuthProvider = ({ children }) => {
       async (event, session) => {
         console.log('Auth event:', event)
         setSession(session)
-        
         if (session) {
           const profile = await authService.getProfile()
           setProfile(profile)
@@ -103,10 +89,6 @@ const AuthProvider = ({ children }) => {
   )
 }
 
-// ============================================================
-// PROTECTED ROUTE
-// ============================================================
-
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
   
@@ -127,10 +109,6 @@ const ProtectedRoute = ({ children }) => {
   
   return children
 }
-
-// ============================================================
-// PUBLIC ROUTE
-// ============================================================
 
 const PublicRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
@@ -153,13 +131,9 @@ const PublicRoute = ({ children }) => {
   return children
 }
 
-// ============================================================
-// APP COMPONENT
-// ============================================================
-
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AuthProvider>
         <Routes>
           <Route 
@@ -170,7 +144,6 @@ function App() {
               </PublicRoute>
             } 
           />
-          
           <Route
             path="/dashboard/*"
             element={
@@ -179,12 +152,11 @@ function App() {
               </ProtectedRoute>
             }
           />
-          
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
 
