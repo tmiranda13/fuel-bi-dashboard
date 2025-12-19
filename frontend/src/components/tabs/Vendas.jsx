@@ -19,6 +19,46 @@ const Vendas = () => {
   const [kpis, setKpis] = useState([])
   const [appliedStartDate, setAppliedStartDate] = useState(startDate)
   const [appliedEndDate, setAppliedEndDate] = useState(endDate)
+  const [currentMonthProjection, setCurrentMonthProjection] = useState(null)
+  
+  // Fetch current month projection (independent of date pickers)
+  const fetchCurrentMonthProjection = async () => {
+    try {
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth()
+      const today = now.getDate()
+      
+      // Current month start and today
+      const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      const todayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(today).padStart(2, '0')}`
+      
+      // Days elapsed in current month (including today)
+      const daysElapsed = today
+      
+      // Total days in current month
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      
+      // Fetch current month's sales
+      const data = await fetchVendasDashboard(monthStart, todayStr)
+      
+      // Calculate VMD and projection
+      const totalVolume = data.total_volume || 0
+      const vmd = daysElapsed > 0 ? totalVolume / daysElapsed : 0
+      const projected = Math.round(vmd * daysInMonth)
+      
+      setCurrentMonthProjection({
+        vmd: Math.round(vmd),
+        projected,
+        daysElapsed,
+        daysInMonth,
+        monthName: new Date(year, month).toLocaleDateString('pt-BR', { month: 'long' }),
+        year
+      })
+    } catch (err) {
+      console.error('Error fetching current month projection:', err)
+    }
+  }
 
  const fetchData = async () => {
   try {
@@ -45,6 +85,7 @@ const Vendas = () => {
 
   useEffect(() => {
     fetchData()
+	fetchCurrentMonthProjection()
   }, [])
 
   // Get all months in the selected date range with their day counts
@@ -624,11 +665,17 @@ const Vendas = () => {
           </Card>
         </Col>
         <Col md={4} sm={6} className="mb-3">
-          <Card className="h-100 border-warning">
+          <Card className="h-100 border-success">
             <Card.Body>
-              <Card.Title className="text-muted fs-6">Volume Projetado <MockDataBadge /></Card.Title>
-              <Card.Text className="fs-4 fw-bold text-muted">N/A</Card.Text>
-              <small className="text-warning">Projeção não implementada</small>
+              <Card.Title className="text-muted fs-6">Volume Projetado</Card.Title>
+              <Card.Text className="fs-4 fw-bold text-success">
+                {currentMonthProjection ? `${currentMonthProjection.projected.toLocaleString('pt-BR')} L` : 'Calculando...'}
+              </Card.Text>
+              {currentMonthProjection && (
+                <small className="text-muted">
+                  {currentMonthProjection.monthName}/{currentMonthProjection.year} • VMD: {currentMonthProjection.vmd.toLocaleString('pt-BR')} L × {currentMonthProjection.daysInMonth} dias
+                </small>
+              )}
             </Card.Body>
           </Card>
         </Col>
