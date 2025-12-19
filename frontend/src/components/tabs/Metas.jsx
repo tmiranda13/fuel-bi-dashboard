@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react'
 import { Row, Col, Card, Badge, Form, Button, Table, Alert, Spinner } from 'react-bootstrap'
 import { sortProductsByStandardOrder, PRODUCT_ORDER, PRODUCT_NAMES } from '../../services/dashboardApi'
 import { kpisService } from '../../services/dataService'
+import { supabase } from '../../services/supabase'
 
 // Input cell component
 const InputCell = memo(({ kpiType, productCode, unit, value, onChange, placeholder, existingKpi }) => {
@@ -172,7 +173,10 @@ const Metas = () => {
     if (existingKpi) {
       return await kpisService.updateKpi(existingKpi.id, payload)
     } else {
-      return await kpisService.createKpi(payload)
+      // Pass companyId to avoid multiple getSession calls
+      const { data: { session } } = await supabase.auth.getSession()
+      const companyId = session?.user?.app_metadata?.company_id
+      return await kpisService.createKpi(payload, companyId)
     }
   }
 
@@ -187,7 +191,15 @@ const Metas = () => {
     setError(null)
     setSuccess(null)
 
-    try {
+try {
+      // Get company_id once before all saves
+      const { data: { session } } = await supabase.auth.getSession()
+      const companyId = session?.user?.app_metadata?.company_id
+      
+      if (!companyId) {
+        throw new Error('Session expired. Please login again.')
+      }
+
       const savePromises = []
 
       for (const key of modifiedKeys) {

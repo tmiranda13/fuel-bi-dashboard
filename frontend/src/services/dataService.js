@@ -298,10 +298,12 @@ export const kpisService = {
     return kpi ? parseFloat(kpi.target_value) : null
   },
   
-  async createKpi(kpiData) {
-    // Get company_id from JWT
-    const { data: { session } } = await supabase.auth.getSession()
-    const companyId = session?.user?.app_metadata?.company_id
+async createKpi(kpiData, companyId = null) {
+    // Use provided companyId or get from session
+    if (!companyId) {
+      const { data: { session } } = await supabase.auth.getSession()
+      companyId = session?.user?.app_metadata?.company_id
+    }
 
     if (!companyId) {
       throw new Error('Company ID not found in session')
