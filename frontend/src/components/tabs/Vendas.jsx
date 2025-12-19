@@ -17,23 +17,39 @@ const Vendas = () => {
   const [error, setError] = useState(null)
   const [dashboardData, setDashboardData] = useState(null)
   const [kpis, setKpis] = useState([])
+  const [appliedStartDate, setAppliedStartDate] = useState(startDate)
+  const [appliedEndDate, setAppliedEndDate] = useState(endDate)
 
-  const fetchData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const [data, kpisData] = await Promise.all([
-        fetchVendasDashboard(startDate, endDate),
-        fetchKpis()
-      ])
-      setDashboardData(data)
-      setKpis(kpisData)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+ const fetchData = async () => {
+  try {
+    setLoading(true)
+    setError(null)
+    const [data, kpisData] = await Promise.all([
+      fetchVendasDashboard(startDate, endDate),
+      fetchKpis()
+    ])
+    setDashboardData(data)
+    
+    // Save applied dates
+    setAppliedStartDate(startDate)
+    setAppliedEndDate(endDate)
+    
+    // Filter KPIs by selected month (based on startDate)
+    const [year, month] = startDate.split('-')
+    const monthStart = `${year}-${month}-01`
+    
+    const filteredKpis = kpisData.filter(kpi => {
+      if (!kpi.start_date) return false
+      return kpi.start_date === monthStart
+    })
+    
+    setKpis(filteredKpis)
+  } catch (err) {
+    setError(err.message)
+  } finally {
+    setLoading(false)
   }
+}
 
   useEffect(() => {
     fetchData()
@@ -41,8 +57,8 @@ const Vendas = () => {
 
 // Calculate proration factor based on selected days vs days in month
   const getProratedFactor = useCallback(() => {
-    const start = new Date(startDate)
-    const end = new Date(endDate)
+    const start = new Date(appliedStartDate)
+    const end = new Date(appliedEndDate)
     
     // Days in selected range
     const selectedDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
@@ -53,7 +69,7 @@ const Vendas = () => {
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     
     return selectedDays / daysInMonth
-  }, [startDate, endDate])
+  }, [appliedStartDate, appliedEndDate])
 
   // Helper to get KPI target by type and product code
   const getKpiTarget = (kpiType, productCode = null) => {
