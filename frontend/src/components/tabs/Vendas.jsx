@@ -106,7 +106,8 @@ const Vendas = () => {
   // Get volume target for product (prorated)
   const getVolumeTarget = (productName) => {
     const code = getProductCode(productName)
-    return code ? getProratedKpiTarget('sales_volume', code) : null
+    const target = code ? getProratedKpiTarget('sales_volume', code) : null
+    return target ? Math.round(target) : null
   }
 
   // Get margin target for product (not prorated - it's a percentage)
