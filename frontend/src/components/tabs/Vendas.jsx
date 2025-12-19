@@ -34,16 +34,8 @@ const Vendas = () => {
     setAppliedStartDate(startDate)
     setAppliedEndDate(endDate)
     
-    // Filter KPIs by selected month (based on startDate)
-    const [year, month] = startDate.split('-')
-    const monthStart = `${year}-${month}-01`
-    
-    const filteredKpis = kpisData.filter(kpi => {
-      if (!kpi.start_date) return false
-      return kpi.start_date === monthStart
-    })
-    
-    setKpis(filteredKpis)
+    // Store all KPIs (multi-month proration will filter by month when calculating)
+    setKpis(kpisData)
   } catch (err) {
     setError(err.message)
   } finally {
@@ -55,36 +47,79 @@ const Vendas = () => {
     fetchData()
   }, [])
 
-// Calculate proration factor based on selected days vs days in month
-  const getProratedFactor = useCallback(() => {
+  // Get all months in the selected date range with their day counts
+  const getMonthsInRange = useCallback(() => {
     const start = new Date(appliedStartDate)
     const end = new Date(appliedEndDate)
+    const months = []
     
-    // Days in selected range
-    const selectedDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
+    let current = new Date(start.getFullYear(), start.getMonth(), 1)
     
-    // Days in the month (based on startDate month)
-    const year = start.getFullYear()
-    const month = start.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    while (current <= end) {
+      const year = current.getFullYear()
+      const month = current.getMonth()
+      const daysInMonth = new Date(year, month + 1, 0).getDate()
+      const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      
+      // Calculate days selected in this month
+      const rangeStart = new Date(Math.max(start.getTime(), current.getTime()))
+      const monthEnd = new Date(year, month + 1, 0)
+      const rangeEnd = new Date(Math.min(end.getTime(), monthEnd.getTime()))
+      
+      const daysSelected = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24)) + 1
+      
+      months.push({
+        year,
+        month,
+        monthStart,
+        daysInMonth,
+        daysSelected,
+        factor: daysSelected / daysInMonth
+      })
+      
+      // Move to next month
+      current = new Date(year, month + 1, 1)
+    }
     
-    return selectedDays / daysInMonth
+    return months
   }, [appliedStartDate, appliedEndDate])
 
-  // Helper to get KPI target by type and product code
-  const getKpiTarget = (kpiType, productCode = null) => {
+  // Helper to get KPI target by type, product code, and month
+  const getKpiTargetForMonth = (kpiType, productCode, monthStart) => {
     const kpi = kpis.find(k =>
       k.kpi_type === kpiType &&
-      (productCode ? k.product_code === productCode : !k.product_code)
+      (productCode ? k.product_code === productCode : !k.product_code) &&
+      k.start_date === monthStart
+    )
+    return kpi ? parseFloat(kpi.target_value) : 0
+  }
+
+ // Helper to get KPI target by type and product code (for non-prorated like margins)
+  const getKpiTarget = (kpiType, productCode = null) => {
+    // For percentages, get the most recent month's target
+    const months = getMonthsInRange()
+    if (months.length === 0) return null
+    
+    const lastMonth = months[months.length - 1]
+    const kpi = kpis.find(k =>
+      k.kpi_type === kpiType &&
+      (productCode ? k.product_code === productCode : !k.product_code) &&
+      k.start_date === lastMonth.monthStart
     )
     return kpi ? parseFloat(kpi.target_value) : null
   }
 
-  // Get prorated KPI target
+  // Get prorated KPI target summed across all months in range
   const getProratedKpiTarget = (kpiType, productCode = null) => {
-    const monthlyTarget = getKpiTarget(kpiType, productCode)
-    if (!monthlyTarget) return null
-    return monthlyTarget * getProratedFactor()
+    const months = getMonthsInRange()
+    let total = 0
+    
+    for (const m of months) {
+      const monthlyTarget = getKpiTargetForMonth(kpiType, productCode, m.monthStart)
+      total += monthlyTarget * m.factor
+    }
+    
+    return total > 0 ? total : null
   }
 
   // Product name to code mapping
@@ -103,7 +138,7 @@ const Vendas = () => {
     return productNameToCode[normalized] || null
   }
 
-  // Get volume target for product (prorated)
+  // Get volume target for product (prorated across months, rounded)
   const getVolumeTarget = (productName) => {
     const code = getProductCode(productName)
     const target = code ? getProratedKpiTarget('sales_volume', code) : null
@@ -121,10 +156,11 @@ const Vendas = () => {
     return getKpiTarget('cost', category)
   }
 
-  // Get revenue target for product (prorated)
+  // Get revenue target for product (prorated across months, rounded)
   const getRevenueTarget = (productName) => {
     const code = getProductCode(productName)
-    return code ? getProratedKpiTarget('revenue', code) : null
+    const target = code ? getProratedKpiTarget('revenue', code) : null
+    return target ? Math.round(target) : null
   }
 
   const clientesPJData = [
