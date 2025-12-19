@@ -176,7 +176,7 @@ const Metas = () => {
     }
   }
 
-  // Save all modified KPIs
+// Save all modified KPIs
   const handleSaveAll = async () => {
     if (modifiedKeys.size === 0) {
       setError('Nenhuma meta foi modificada')
@@ -212,19 +212,46 @@ const Metas = () => {
         }
 
         const actualProductCode = productCode === 'total' ? null : productCode
-        savePromises.push(saveKpi(kpiType, actualProductCode, value))
+        
+        // Wrap each save in its own try-catch
+        const saveWithCatch = async () => {
+          try {
+            return await saveKpi(kpiType, actualProductCode, value)
+          } catch (err) {
+            console.error(`Error saving ${kpiType} for ${productCode}:`, err)
+            throw err
+          }
+        }
+        
+        savePromises.push(saveWithCatch())
       }
 
       if (savePromises.length === 0) {
         setError('Nenhuma meta válida para salvar')
+        setSaving(false)
         return
       }
 
-      await Promise.all(savePromises)
-      setSuccess(`${savePromises.length} meta(s) salva(s) com sucesso!`)
-      await fetchKpis()
+      // Use Promise.allSettled to handle partial failures
+      const results = await Promise.allSettled(savePromises)
+      
+      const succeeded = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+      
+      if (failed > 0) {
+        const errors = results
+          .filter(r => r.status === 'rejected')
+          .map(r => r.reason?.message || 'Unknown error')
+        setError(`${failed} meta(s) falharam: ${errors.join(', ')}`)
+      }
+      
+      if (succeeded > 0) {
+        setSuccess(`${succeeded} meta(s) salva(s) com sucesso!`)
+        await fetchKpis()
+      }
     } catch (err) {
-      setError(err.message)
+      console.error('Save error:', err)
+      setError(err.message || 'Erro desconhecido ao salvar')
     } finally {
       setSaving(false)
     }
