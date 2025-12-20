@@ -665,20 +665,28 @@ const Vendas = () => {
           </Card>
         </Col>
         <Col md={4} sm={6} className="mb-3">
-          <Card className="h-100 border-success">
-            <Card.Body>
-              <Card.Title className="text-muted fs-6">Volume Projetado</Card.Title>
-              <Card.Text className="fs-4 fw-bold text-success">
-                {currentMonthProjection ? `${currentMonthProjection.projected.toLocaleString('pt-BR')} L` : 'Calculando...'}
-              </Card.Text>
-              {currentMonthProjection && (
-                <small className="text-muted">
-                  {currentMonthProjection.monthName}/{currentMonthProjection.year} • VMD: {currentMonthProjection.vmd.toLocaleString('pt-BR')} L × {currentMonthProjection.daysInMonth} dias
-                </small>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
+		  <Card className="h-100 border-success">
+          <Card.Body>
+			<Card.Title className="text-muted fs-6">Volume Projetado <small className="text-success ms-2">✓ Real</small></Card.Title>
+			<Card.Text className="fs-4 fw-bold text-success">
+			{(() => {
+          const now = new Date()
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+          const projected = Math.round(volumeMedioMTD * daysInMonth)
+          return `${projected.toLocaleString('pt-BR')} L`
+        })()}
+      </Card.Text>
+      <small className="text-muted">
+        {(() => {
+          const now = new Date()
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+          const monthName = now.toLocaleDateString('pt-BR', { month: 'long' })
+          return `${monthName}/${now.getFullYear()} • VMD: ${Math.round(volumeMedioMTD).toLocaleString('pt-BR')} L × ${daysInMonth} dias`
+        })()}
+      </small>
+    </Card.Body>
+  </Card>
+</Col>
       </Row>
 
       <Row className="mb-4">
