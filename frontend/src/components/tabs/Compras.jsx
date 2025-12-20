@@ -15,6 +15,14 @@ const Compras = () => {
     return localStorage.getItem('compras_endDate') || '2025-12-03'
   })
   const [showProductDropdown, setShowProductDropdown] = useState(false)
+  const [selectedChartFuels, setSelectedChartFuels] = useState({
+  gasolinaComum: true,
+  gasolinaAditivada: true,
+  etanol: true,
+  dieselS10: true,
+  dieselS500: true,
+  custoMedioGeral: true
+  })
 
   // API data state
   const [loading, setLoading] = useState(true)
@@ -554,34 +562,88 @@ const custoMedioData = (() => {
       </Row>
 
       {/* Charts - Real Data */}
-      <Row className="mb-4">
-        <Col lg={12} className="mb-3">
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>
-                Evolutivo de Preço de Compra (R$/L)
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
-              <p className="text-muted small mb-3">Custo por litro de cada produto e média geral ao longo do tempo</p>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={custoMedioData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="dia" />
-                  <YAxis />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-                  <Line type="stepAfter" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (R$/L)" dot={false} connectNulls />
-				  <Line type="stepAfter" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (R$/L)" dot={false} connectNulls />
-				  <Line type="stepAfter" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (R$/L)" dot={false} connectNulls />
-				  <Line type="stepAfter" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (R$/L)" dot={false} connectNulls />
-				  <Line type="stepAfter" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (R$/L)" dot={false} connectNulls />
-				  <Line type="stepAfter" dataKey="custoMedioGeral" stroke="#000000" strokeWidth={3} name="Média Geral (R$/L)" dot={false} connectNulls />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+<Row className="mb-4">
+  <Col lg={12} className="mb-3">
+    <Card className="border-success">
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <Card.Title className="mb-0">
+              Evolutivo de Preço de Compra (R$/L)
+              <small className="text-success ms-2">✓ Dados Reais</small>
+            </Card.Title>
+            <p className="text-muted small mb-0">Custo por litro de cada produto e média geral ao longo do tempo</p>
+          </div>
+          <div className="d-flex flex-wrap gap-3">
+            <Form.Check
+              inline
+              type="checkbox"
+              id="chart-filter-gc"
+              label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
+              checked={selectedChartFuels.gasolinaComum}
+              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, gasolinaComum: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="chart-filter-ga"
+              label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
+              checked={selectedChartFuels.gasolinaAditivada}
+              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, gasolinaAditivada: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="chart-filter-et"
+              label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
+              checked={selectedChartFuels.etanol}
+              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, etanol: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="chart-filter-ds10"
+              label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
+              checked={selectedChartFuels.dieselS10}
+              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, dieselS10: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="chart-filter-ds500"
+              label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
+              checked={selectedChartFuels.dieselS500}
+              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, dieselS500: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="chart-filter-media"
+              label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Média Geral</span>}
+              checked={selectedChartFuels.custoMedioGeral}
+              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, custoMedioGeral: e.target.checked })}
+            />
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={custoMedioData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="dia" />
+            <YAxis domain={['auto', 'auto']} />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend />
+            {selectedChartFuels.gasolinaComum && <Line type="stepAfter" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (R$/L)" dot={false} connectNulls />}
+            {selectedChartFuels.gasolinaAditivada && <Line type="stepAfter" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (R$/L)" dot={false} connectNulls />}
+            {selectedChartFuels.etanol && <Line type="stepAfter" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (R$/L)" dot={false} connectNulls />}
+            {selectedChartFuels.dieselS10 && <Line type="stepAfter" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (R$/L)" dot={false} connectNulls />}
+            {selectedChartFuels.dieselS500 && <Line type="stepAfter" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (R$/L)" dot={false} connectNulls />}
+            {selectedChartFuels.custoMedioGeral && <Line type="stepAfter" dataKey="custoMedioGeral" stroke="#000000" strokeWidth={3} name="Média Geral (R$/L)" dot={false} connectNulls />}
+          </LineChart>
+        </ResponsiveContainer>
+      </Card.Body>
+    </Card>
+  </Col>
+</Row>
 
       <Row className="mb-4">
   <Col lg={5} className="mb-3">
