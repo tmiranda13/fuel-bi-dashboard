@@ -323,7 +323,7 @@ const Vendas = () => {
   }) || []
 
   const numberOfDays = dashboardData.evolution?.length || 1
-  const volumeMedioMTD = numberOfDays > 0 ? dashboardData.total_volume / numberOfDays : 0
+  const volumeMedioMTD = currentMonthProjection?.vmd || 0
 
   const vendasPorProduto = sortedProducts.map((product, index) => {
     const volumeVendido = parseFloat(product.volume_sold)
@@ -647,14 +647,15 @@ const Vendas = () => {
 
       <Row className="mb-4">
         <Col md={4} sm={6} className="mb-3">
-          <Card className="h-100 border-success">
-            <Card.Body>
-              <Card.Title className="text-muted fs-6">Volume Médio MTD <small className="text-success ms-2">✓ Real</small></Card.Title>
-              <Card.Text className="fs-4 fw-bold text-success">{Math.round(volumeMedioMTD).toLocaleString('pt-BR')} L</Card.Text>
-              <small className="text-muted">{numberOfDays} dias no período</small>
-            </Card.Body>
-          </Card>
-        </Col>
+  <Card className="h-100 border-success">
+    <Card.Body>
+      <Card.Title className="text-muted fs-6">Volume Médio MTD <small className="text-success ms-2">✓ Real</small></Card.Title>
+      <Card.Text className="fs-4 fw-bold text-success">
+        {currentMonthProjection ? `${currentMonthProjection.vmd.toLocaleString('pt-BR')} L` : 'Calculando...'}
+      </Card.Text>
+    </Card.Body>
+  </Card>
+</Col>
         <Col md={4} sm={6} className="mb-3">
           <Card className="h-100 border-warning">
             <Card.Body>
@@ -665,25 +666,17 @@ const Vendas = () => {
           </Card>
         </Col>
         <Col md={4} sm={6} className="mb-3">
-		  <Card className="h-100 border-success">
-          <Card.Body>
-			<Card.Title className="text-muted fs-6">Volume Projetado <small className="text-success ms-2">✓ Real</small></Card.Title>
-			<Card.Text className="fs-4 fw-bold text-success">
-			{(() => {
-          const now = new Date()
-          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-          const projected = Math.round(volumeMedioMTD * daysInMonth)
-          return `${projected.toLocaleString('pt-BR')} L`
-        })()}
+  <Card className="h-100 border-success">
+    <Card.Body>
+      <Card.Title className="text-muted fs-6">Volume Projetado <small className="text-success ms-2">✓ Real</small></Card.Title>
+      <Card.Text className="fs-4 fw-bold text-success">
+        {currentMonthProjection ? `${currentMonthProjection.projected.toLocaleString('pt-BR')} L` : 'Calculando...'}
       </Card.Text>
-      <small className="text-muted">
-        {(() => {
-          const now = new Date()
-          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-          const monthName = now.toLocaleDateString('pt-BR', { month: 'long' })
-          return `${monthName}/${now.getFullYear()} • VMD: ${Math.round(volumeMedioMTD).toLocaleString('pt-BR')} L × ${daysInMonth} dias`
-        })()}
-      </small>
+      {currentMonthProjection && (
+        <small className="text-muted">
+          {currentMonthProjection.monthName}/{currentMonthProjection.year} • VMD: {currentMonthProjection.vmd.toLocaleString('pt-BR')} L × {currentMonthProjection.daysInMonth} dias
+        </small>
+      )}
     </Card.Body>
   </Card>
 </Col>
