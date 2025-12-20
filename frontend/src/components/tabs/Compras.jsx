@@ -538,7 +538,7 @@ const Compras = () => {
           <Card className="border-success">
             <Card.Body>
               <Card.Title>
-                Evolução do Custo Médio Geral (R$/L)
+                Evolutivo de Preço de Compra (R$/L)
                 <small className="text-success ms-2">✓ Dados Reais</small>
               </Card.Title>
               <p className="text-muted small mb-3">Custo por litro de cada produto e média geral ao longo do tempo</p>
