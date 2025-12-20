@@ -21,6 +21,15 @@ const Vendas = () => {
   const [appliedEndDate, setAppliedEndDate] = useState(endDate)
   const [currentMonthProjection, setCurrentMonthProjection] = useState(null)
   
+  const [selectedFuels, setSelectedFuels] = useState({
+  gasolinaComum: true,
+  gasolinaAditivada: true,
+  etanol: true,
+  dieselS10: true,
+  dieselS500: true,
+  total: true
+})
+  
   // Fetch current month projection (independent of date pickers)
   const fetchCurrentMonthProjection = async () => {
     try {
@@ -723,29 +732,81 @@ const Vendas = () => {
       </Row>
 
       <Row className="mb-4">
-        <Col lg={12} className="mb-3">
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>Evolução de Volume Diário <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={volumeDataPerProduct}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="dia" />
-                  <YAxis />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-                  <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />
-                  <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />
-                  <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />
-                  <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />
-                  <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />
-                  <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+  <Col lg={12} className="mb-3">
+    <Card className="border-success">
+      <Card.Body>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <Card.Title className="mb-0">Evolução de Volume Diário <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
+          <div className="d-flex flex-wrap gap-3">
+            <Form.Check
+              inline
+              type="checkbox"
+              id="filter-gc"
+              label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
+              checked={selectedFuels.gasolinaComum}
+              onChange={(e) => setSelectedFuels({ ...selectedFuels, gasolinaComum: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="filter-ga"
+              label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
+              checked={selectedFuels.gasolinaAditivada}
+              onChange={(e) => setSelectedFuels({ ...selectedFuels, gasolinaAditivada: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="filter-et"
+              label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
+              checked={selectedFuels.etanol}
+              onChange={(e) => setSelectedFuels({ ...selectedFuels, etanol: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="filter-ds10"
+              label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
+              checked={selectedFuels.dieselS10}
+              onChange={(e) => setSelectedFuels({ ...selectedFuels, dieselS10: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="filter-ds500"
+              label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
+              checked={selectedFuels.dieselS500}
+              onChange={(e) => setSelectedFuels({ ...selectedFuels, dieselS500: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="filter-total"
+              label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
+              checked={selectedFuels.total}
+              onChange={(e) => setSelectedFuels({ ...selectedFuels, total: e.target.checked })}
+            />
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={volumeDataPerProduct}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="dia" />
+            <YAxis />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend />
+            {selectedFuels.gasolinaComum && <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />}
+            {selectedFuels.gasolinaAditivada && <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />}
+            {selectedFuels.etanol && <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />}
+            {selectedFuels.dieselS10 && <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />}
+            {selectedFuels.dieselS500 && <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />}
+            {selectedFuels.total && <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />}
+          </LineChart>
+        </ResponsiveContainer>
+      </Card.Body>
+    </Card>
+  </Col>
+</Row>
 
       <Row className="mb-4">
         <Col lg={8} className="mb-3">
