@@ -692,46 +692,6 @@ const Vendas = () => {
       </Row>
 
       <Row className="mb-4">
-        <Col lg={12}>
-          <Card className="bg-success bg-opacity-10 border-success">
-            <Card.Body>
-              <Row className="align-items-center">
-                <Col md={3}>
-                  <h5 className="mb-0">Mix de Gasolina <small className="text-success ms-2">Dados Reais</small></h5>
-                  <p className="text-muted small mb-0">Comum vs Aditivada</p>
-                  {getMixTarget('gasolina') && (
-                    <Badge bg={parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'success' : 'warning'} className="mt-1">
-                      Meta: {getMixTarget('gasolina')}% aditivada
-                    </Badge>
-                  )}
-                </Col>
-                <Col md={3}>
-                  <div className="text-center">
-                    <div className="text-muted small">Gasolina Comum</div>
-                    <div className="fs-3 fw-bold text-primary">{mixGasolinaComum}%</div>
-                    <div className="small text-muted">{Math.round(gasolinaComumTotal).toLocaleString('pt-BR')} L</div>
-                  </div>
-                </Col>
-                <Col md={3}>
-                  <div className="text-center">
-                    <div className="text-muted small">Gasolina Aditivada</div>
-                    <div className="fs-3 fw-bold text-success">{mixGasolinaAditivada}%</div>
-                    <div className="small text-muted">{Math.round(gasolinaAditivadaTotal).toLocaleString('pt-BR')} L</div>
-                  </div>
-                </Col>
-                <Col md={3}>
-                  <div className="text-center">
-                    <div className="text-muted small">Total Gasolinas</div>
-                    <div className="fs-4 fw-bold">{Math.round(gasolinaTotal).toLocaleString('pt-BR')} L</div>
-                  </div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      <Row className="mb-4">
   <Col lg={12} className="mb-3">
     <Card className="border-success">
       <Card.Body>
@@ -808,70 +768,102 @@ const Vendas = () => {
   </Col>
 </Row>
 
-      <Row className="mb-4">
-        <Col lg={8} className="mb-3">
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>Breakdown por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={productBreakdown}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry) => `${entry.name}: ${((entry.value / totalVolume) * 100).toFixed(1)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {productBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col lg={4} className="mb-3">
-  <Card className="h-100 border-success">
-    <Card.Body>
-      <Card.Title>Mix de Gasolina <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-      {getMixTarget('gasolina') && (
-        <Badge bg={parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'success' : 'warning'} className="mb-2">
-          Meta: {getMixTarget('gasolina')}% aditivada
-        </Badge>
-      )}
-      <ResponsiveContainer width="100%" height={200}>
-        <PieChart>
-          <Pie
-            data={[
-              { name: 'Comum', value: gasolinaComumTotal, color: '#0088FE' },
-              { name: 'Aditivada', value: gasolinaAditivadaTotal, color: '#00C49F' }
-            ]}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            label={(entry) => `${entry.name}: ${((entry.value / gasolinaTotal) * 100).toFixed(1)}%`}
-            outerRadius={70}
-            fill="#8884d8"
-            dataKey="value"
-          >
-            <Cell fill="#0088FE" />
-            <Cell fill="#00C49F" />
-          </Pie>
-          <Tooltip formatter={(value) => `${Math.round(value).toLocaleString('pt-BR')} L`} />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="text-center mt-2">
-        <small className="text-muted">Total: {Math.round(gasolinaTotal).toLocaleString('pt-BR')} L</small>
-      </div>
-    </Card.Body>
-  </Card>
-</Col>
-      </Row>
+<Row className="mb-4">
+  <Col lg={4} className="mb-3">
+    <Card className="h-100 border-success">
+      <Card.Body>
+        <Card.Title>Breakdown por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
+        <ResponsiveContainer width="100%" height={250}>
+          <PieChart>
+            <Pie
+              data={productBreakdown}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={(entry) => `${((entry.value / totalVolume) * 100).toFixed(0)}%`}
+              outerRadius={80}
+              fill="#8884d8"
+              dataKey="value"
+            >
+              {productBreakdown.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(value) => `${Math.round(value).toLocaleString('pt-BR')} L`} />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      </Card.Body>
+    </Card>
+  </Col>
+  <Col lg={4} className="mb-3">
+    <Card className="h-100 border-success bg-success bg-opacity-10">
+      <Card.Body className="d-flex flex-column justify-content-center">
+        <h5 className="text-center mb-1">Mix de Gasolina</h5>
+        <p className="text-muted small text-center mb-2">Comum vs Aditivada</p>
+        {getMixTarget('gasolina') && (
+          <div className="text-center mb-3">
+            <Badge bg={parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'success' : 'warning'}>
+              Meta: {getMixTarget('gasolina')}% aditivada
+            </Badge>
+          </div>
+        )}
+        <Row className="text-center">
+          <Col xs={6}>
+            <div className="text-muted small">Gasolina Comum</div>
+            <div className="fs-3 fw-bold text-primary">{mixGasolinaComum}%</div>
+            <div className="small text-muted">{Math.round(gasolinaComumTotal).toLocaleString('pt-BR')} L</div>
+          </Col>
+          <Col xs={6}>
+            <div className="text-muted small">Gasolina Aditivada</div>
+            <div className="fs-3 fw-bold text-success">{mixGasolinaAditivada}%</div>
+            <div className="small text-muted">{Math.round(gasolinaAditivadaTotal).toLocaleString('pt-BR')} L</div>
+          </Col>
+        </Row>
+        <div className="text-center mt-3">
+          <div className="text-muted small">Total Gasolinas</div>
+          <div className="fs-4 fw-bold">{Math.round(gasolinaTotal).toLocaleString('pt-BR')} L</div>
+        </div>
+      </Card.Body>
+    </Card>
+  </Col>
+  <Col lg={4} className="mb-3">
+    <Card className="h-100 border-success">
+      <Card.Body>
+        <Card.Title>Mix de Gasolina <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
+        {getMixTarget('gasolina') && (
+          <Badge bg={parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'success' : 'warning'} className="mb-2">
+            Meta: {getMixTarget('gasolina')}% aditivada
+          </Badge>
+        )}
+        <ResponsiveContainer width="100%" height={200}>
+          <PieChart>
+            <Pie
+              data={[
+                { name: 'Comum', value: gasolinaComumTotal, color: '#0088FE' },
+                { name: 'Aditivada', value: gasolinaAditivadaTotal, color: '#00C49F' }
+              ]}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={(entry) => `${entry.name}: ${((entry.value / gasolinaTotal) * 100).toFixed(1)}%`}
+              outerRadius={70}
+              fill="#8884d8"
+              dataKey="value"
+            >
+              <Cell fill="#0088FE" />
+              <Cell fill="#00C49F" />
+            </Pie>
+            <Tooltip formatter={(value) => `${Math.round(value).toLocaleString('pt-BR')} L`} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="text-center mt-2">
+          <small className="text-muted">Total: {Math.round(gasolinaTotal).toLocaleString('pt-BR')} L</small>
+        </div>
+      </Card.Body>
+    </Card>
+  </Col>
+</Row>
 	  <Row className="mb-4">
         <Col lg={12}>
           <MockDataCard title="Clientes Pessoa Jurídica (PJ)">
