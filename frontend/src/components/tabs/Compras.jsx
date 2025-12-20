@@ -563,142 +563,104 @@ const Compras = () => {
       </Row>
 
       <Row className="mb-4">
-        <Col lg={8} className="mb-3">
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>
-                Participação por Produto (%)
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={volumePorProduto}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry) => {
-                      const total = volumePorProduto.reduce((sum, item) => sum + item.volume, 0)
-                      const percent = ((entry.volume / total) * 100).toFixed(1)
-                      return `${percent}% - ${entry.produto}`
-                    }}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="volume"
-                    nameKey="produto"
-                  >
-                    {volumePorProduto.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value) => {
-                      const total = volumePorProduto.reduce((sum, item) => sum + item.volume, 0)
-                      const percent = ((value / total) * 100).toFixed(1)
-                      return `${Math.round(value).toLocaleString('pt-BR')} L (${percent}%)`
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col lg={4} className="mb-3">
-          <Card className="h-100 border-success">
-            <Card.Body>
-              <Card.Title>
-                Volume por Produto
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
-              <Table size="sm" className="mb-0">
-                <tbody>
-                  {volumePorProduto.map((item, index) => (
-                    <tr key={index}>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            width: '12px',
-                            height: '12px',
-                            backgroundColor: item.color,
-                            marginRight: '8px',
-                            borderRadius: '2px'
-                          }}
-                        ></span>
-                        {item.produto}
-                      </td>
-                      <td className="text-end">
-                        <strong>{Math.round(item.volume).toLocaleString('pt-BR')} L</strong>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Suppliers Table - Real Data */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>
-                Análise por Fornecedor
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
-              <p className="small text-muted mb-3">
-                CNPJ extraído automaticamente dos dados de fornecedores
-              </p>
-              <Table responsive hover>
-                <thead>
-                  <tr>
-                    <th>Razão Social</th>
-                    <th>CNPJ</th>
-                    <th>Volume Total (L)</th>
-                    <th>Custo Médio (R$/L)</th>
-                    <th>Custo Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fornecedoresData.map(fornecedor => (
-                    <tr key={fornecedor.id}>
-                      <td><strong>{fornecedor.razaoSocial}</strong></td>
-                      <td>{fornecedor.cnpj}</td>
-                      <td>{Math.round(fornecedor.volume).toLocaleString('pt-BR')} L</td>
-                      <td>R$ {fornecedor.custoMedio.toFixed(2)}/L</td>
-                      <td>
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        }).format(fornecedor.custoTotal)}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="table-secondary">
-                    <td colSpan="2"><strong>Total</strong></td>
-                    <td>
-                      <strong>
-                        {Math.round(fornecedoresData.reduce((sum, f) => sum + f.volume, 0)).toLocaleString('pt-BR')} L
-                      </strong>
-                    </td>
-                    <td>-</td>
-                    <td>
-                      <strong>
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        }).format(fornecedoresData.reduce((sum, f) => sum + f.custoTotal, 0))}
-                      </strong>
-                    </td>
-                  </tr>
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+  <Col lg={5} className="mb-3">
+    <Card className="h-100 border-success">
+      <Card.Body>
+        <Card.Title>
+          Participação por Produto (%)
+          <small className="text-success ms-2">✓ Dados Reais</small>
+        </Card.Title>
+        <ResponsiveContainer width="100%" height={300}>
+          <PieChart>
+            <Pie
+              data={volumePorProduto}
+              cx="50%"
+              cy="50%"
+              labelLine={false}
+              label={(entry) => {
+                const total = volumePorProduto.reduce((sum, item) => sum + item.volume, 0)
+                const percent = ((entry.volume / total) * 100).toFixed(1)
+                return `${percent}% - ${entry.produto}`
+              }}
+              outerRadius={100}
+              fill="#8884d8"
+              dataKey="volume"
+              nameKey="produto"
+            >
+              {volumePorProduto.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value) => {
+                const total = volumePorProduto.reduce((sum, item) => sum + item.volume, 0)
+                const percent = ((value / total) * 100).toFixed(1)
+                return `${Math.round(value).toLocaleString('pt-BR')} L (${percent}%)`
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </Card.Body>
+    </Card>
+  </Col>
+  <Col lg={7} className="mb-3">
+    <Card className="h-100 border-success">
+      <Card.Body>
+        <Card.Title>
+          Análise por Fornecedor
+          <small className="text-success ms-2">✓ Dados Reais</small>
+        </Card.Title>
+        <p className="small text-muted mb-3">
+          CNPJ extraído automaticamente dos dados de fornecedores
+        </p>
+        <Table responsive hover size="sm">
+          <thead>
+            <tr>
+              <th>Razão Social</th>
+              <th>CNPJ</th>
+              <th>Volume Total (L)</th>
+              <th>Custo Médio (R$/L)</th>
+              <th>Custo Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fornecedoresData.map(fornecedor => (
+              <tr key={fornecedor.id}>
+                <td><strong>{fornecedor.razaoSocial}</strong></td>
+                <td>{fornecedor.cnpj}</td>
+                <td>{Math.round(fornecedor.volume).toLocaleString('pt-BR')} L</td>
+                <td>R$ {fornecedor.custoMedio.toFixed(2)}/L</td>
+                <td>
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                  }).format(fornecedor.custoTotal)}
+                </td>
+              </tr>
+            ))}
+            <tr className="table-secondary">
+              <td colSpan="2"><strong>Total</strong></td>
+              <td>
+                <strong>
+                  {Math.round(fornecedoresData.reduce((sum, f) => sum + f.volume, 0)).toLocaleString('pt-BR')} L
+                </strong>
+              </td>
+              <td>-</td>
+              <td>
+                <strong>
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                  }).format(fornecedoresData.reduce((sum, f) => sum + f.custoTotal, 0))}
+                </strong>
+              </td>
+            </tr>
+          </tbody>
+        </Table>
+      </Card.Body>
+    </Card>
+  </Col>
+</Row>
 
       {/* Freight Costs Table - Mock Data */}
       <Row className="mb-4">
