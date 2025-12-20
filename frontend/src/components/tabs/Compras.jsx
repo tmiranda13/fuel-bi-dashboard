@@ -199,24 +199,45 @@ const Compras = () => {
     return null
   }
 
-  // Prepare evolution data for line chart with per-product costs (same layout as Vendas)
-  // Use null for products not purchased on a given day (so line doesn't drop to 0)
-  const custoMedioData = displayEvolution.map(day => {
-    // Parse date manually to avoid timezone offset issues
+// Prepare evolution data for line chart with per-product costs
+// Forward-fill prices: carry the last purchase price until a new purchase is made
+const custoMedioData = (() => {
+  if (!displayEvolution || displayEvolution.length === 0) return []
+  
+  // Track last known price for each product
+  const lastKnownPrice = {
+    gasolinaComum: null,
+    gasolinaAditivada: null,
+    etanol: null,
+    dieselS10: null,
+    dieselS500: null,
+    custoMedioGeral: null
+  }
+  
+  return displayEvolution.map(day => {
     const [year, month, dayNum] = day.date.split('-')
     const formattedDate = `${dayNum}/${month}`
-
+    
+    // Update last known price only when there's a new purchase (non-null value)
+    if (day.GC != null) lastKnownPrice.gasolinaComum = parseFloat(day.GC)
+    if (day.GA != null) lastKnownPrice.gasolinaAditivada = parseFloat(day.GA)
+    if (day.ET != null) lastKnownPrice.etanol = parseFloat(day.ET)
+    if (day.DS10 != null) lastKnownPrice.dieselS10 = parseFloat(day.DS10)
+    if (day.DS500 != null) lastKnownPrice.dieselS500 = parseFloat(day.DS500)
+    if (day.avg_cost != null) lastKnownPrice.custoMedioGeral = parseFloat(day.avg_cost)
+    
     return {
       dia: formattedDate,
-      fullDate: day.date, // Keep full date for tooltip
-      gasolinaComum: day.GC != null ? parseFloat(day.GC) : null,
-      gasolinaAditivada: day.GA != null ? parseFloat(day.GA) : null,
-      etanol: day.ET != null ? parseFloat(day.ET) : null,
-      dieselS10: day.DS10 != null ? parseFloat(day.DS10) : null,
-      dieselS500: day.DS500 != null ? parseFloat(day.DS500) : null,
-      custoMedioGeral: parseFloat(day.avg_cost || 0)
+      fullDate: day.date,
+      gasolinaComum: lastKnownPrice.gasolinaComum,
+      gasolinaAditivada: lastKnownPrice.gasolinaAditivada,
+      etanol: lastKnownPrice.etanol,
+      dieselS10: lastKnownPrice.dieselS10,
+      dieselS500: lastKnownPrice.dieselS500,
+      custoMedioGeral: lastKnownPrice.custoMedioGeral
     }
-  }) || []
+  })
+})()
 
   // All fuel products that should always appear when "todos os produtos" is selected
   // Note: EA (Etanol Aditivado) excluded - this company doesn't sell it
@@ -549,12 +570,12 @@ const Compras = () => {
                   <YAxis />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (R$/L)" dot={false} connectNulls />
-                  <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (R$/L)" dot={false} connectNulls />
-                  <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (R$/L)" dot={false} connectNulls />
-                  <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (R$/L)" dot={false} connectNulls />
-                  <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (R$/L)" dot={false} connectNulls />
-                  <Line type="monotone" dataKey="custoMedioGeral" stroke="#000000" strokeWidth={3} name="Média Geral (R$/L)" dot={false} connectNulls />
+                  <Line type="stepAfter" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (R$/L)" dot={false} connectNulls />
+				  <Line type="stepAfter" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (R$/L)" dot={false} connectNulls />
+				  <Line type="stepAfter" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (R$/L)" dot={false} connectNulls />
+				  <Line type="stepAfter" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (R$/L)" dot={false} connectNulls />
+				  <Line type="stepAfter" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (R$/L)" dot={false} connectNulls />
+				  <Line type="stepAfter" dataKey="custoMedioGeral" stroke="#000000" strokeWidth={3} name="Média Geral (R$/L)" dot={false} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             </Card.Body>
