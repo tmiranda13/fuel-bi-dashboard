@@ -836,25 +836,41 @@ const Vendas = () => {
           </Card>
         </Col>
         <Col lg={4} className="mb-3">
-          <Card className="h-100 border-success">
-            <Card.Body>
-              <Card.Title>Volume por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-              <Table size="sm" className="mb-0">
-                <tbody>
-                  {productBreakdown.map((item, index) => (
-                    <tr key={index}>
-                      <td>
-                        <span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: item.color, marginRight: '8px', borderRadius: '2px' }}></span>
-                        {item.name}
-                      </td>
-                      <td className="text-end"><strong>{Math.round(item.value).toLocaleString('pt-BR')} L</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-        </Col>
+  <Card className="h-100 border-success">
+    <Card.Body>
+      <Card.Title>Mix de Gasolina <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
+      {getMixTarget('gasolina') && (
+        <Badge bg={parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'success' : 'warning'} className="mb-2">
+          Meta: {getMixTarget('gasolina')}% aditivada
+        </Badge>
+      )}
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie
+            data={[
+              { name: 'Comum', value: gasolinaComumTotal, color: '#0088FE' },
+              { name: 'Aditivada', value: gasolinaAditivadaTotal, color: '#00C49F' }
+            ]}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            label={(entry) => `${entry.name}: ${((entry.value / gasolinaTotal) * 100).toFixed(1)}%`}
+            outerRadius={70}
+            fill="#8884d8"
+            dataKey="value"
+          >
+            <Cell fill="#0088FE" />
+            <Cell fill="#00C49F" />
+          </Pie>
+          <Tooltip formatter={(value) => `${Math.round(value).toLocaleString('pt-BR')} L`} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="text-center mt-2">
+        <small className="text-muted">Total: {Math.round(gasolinaTotal).toLocaleString('pt-BR')} L</small>
+      </div>
+    </Card.Body>
+  </Card>
+</Col>
       </Row>
 	  <Row className="mb-4">
         <Col lg={12}>
