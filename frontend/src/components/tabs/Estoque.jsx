@@ -208,50 +208,46 @@ const Estoque = () => {
             <Card.Body>
               <Card.Title>Status de Estoque por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
               <p className="small text-muted mb-3">
-                Entrada e Saída referem-se ao período selecionado. Custo calculado com base no custo médio ponderado das compras.
+                Custo calculado com base no custo médio ponderado das compras.
               </p>
               <Table responsive hover>
                 <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Capacidade (L)</th>
-                    <th>Estoque Atual (L)</th>
-                    <th style={{ width: '12%' }}>Ocupação</th>
-                    <th>Entrada (L)</th>
-                    <th>Saída (L)</th>
-                    <th>Dias Autonomia</th>
-                    <th>Custo Médio (R$/L)</th>
-                    <th>Custo Estoque</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
+  <tr>
+    <th>Produto</th>
+    <th>Capacidade (L)</th>
+    <th>Estoque Atual (L)</th>
+    <th style={{ width: '12%' }}>Ocupação</th>
+    <th>Dias Autonomia</th>
+    <th>Custo Médio (R$/L)</th>
+    <th>Custo Estoque</th>
+    <th>Status</th>
+  </tr>
+</thead>
                 <tbody>
-                  {estoqueData.map(item => (
-                    <tr key={item.id} className={item.status === 'critico' ? 'table-danger' : item.status === 'baixo' ? 'table-warning' : ''}>
-                      <td><strong>{item.produto}</strong></td>
-                      <td><strong className="text-success">{Math.round(item.capacidadeTanque).toLocaleString('pt-BR')}</strong></td>
-                      <td><strong className="text-success">{Math.round(item.estoqueAtual).toLocaleString('pt-BR')}</strong></td>
-                      <td>
-                        <div className="d-flex align-items-center">
-                          <div className="progress" style={{ height: '13px', width: '33px' }}>
-                            <div
-                              className={`progress-bar ${item.percentualOcupacao < 40 ? 'bg-danger' : item.percentualOcupacao < 70 ? 'bg-warning' : 'bg-success'}`}
-                              role="progressbar"
-                              style={{ width: `${Math.min(item.percentualOcupacao, 100)}%` }}
-                            />
-                          </div>
-                          <span className="ms-1 fw-bold" style={{ fontSize: '0.85em' }}>{item.percentualOcupacao.toFixed(0)}%</span>
-                        </div>
-                      </td>
-                      <td><strong className="text-success">{Math.round(item.entradas).toLocaleString('pt-BR')}</strong></td>
-                      <td><strong className="text-success">{Math.round(item.saidas).toLocaleString('pt-BR')}</strong></td>
-                      <td><strong className="text-success">{item.diasAutonomia.toFixed(1)} dias</strong></td>
-                      <td><strong className="text-success">R$ {item.custoMedio.toFixed(2)}/L</strong></td>
-                      <td><strong className="text-success">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.custoEstoque)}</strong></td>
-                      <td>{getStatusBadge(item.status)}</td>
-                    </tr>
-                  ))}
-                </tbody>
+  {estoqueData.map(item => (
+    <tr key={item.id} className={item.status === 'critico' ? 'table-danger' : item.status === 'baixo' ? 'table-warning' : ''}>
+      <td><strong>{item.produto}</strong></td>
+      <td><strong className="text-success">{Math.round(item.capacidadeTanque).toLocaleString('pt-BR')}</strong></td>
+      <td><strong className="text-success">{Math.round(item.estoqueAtual).toLocaleString('pt-BR')}</strong></td>
+      <td>
+        <div className="d-flex align-items-center">
+          <div className="progress" style={{ height: '13px', width: '33px' }}>
+            <div
+              className={`progress-bar ${item.percentualOcupacao < 40 ? 'bg-danger' : item.percentualOcupacao < 70 ? 'bg-warning' : 'bg-success'}`}
+              role="progressbar"
+              style={{ width: `${Math.min(item.percentualOcupacao, 100)}%` }}
+            />
+          </div>
+          <span className="ms-1 fw-bold" style={{ fontSize: '0.85em' }}>{item.percentualOcupacao.toFixed(0)}%</span>
+        </div>
+      </td>
+      <td><strong className="text-success">{item.diasAutonomia.toFixed(1)} dias</strong></td>
+      <td><strong className="text-success">R$ {item.custoMedio.toFixed(2)}/L</strong></td>
+      <td><strong className="text-success">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.custoEstoque)}</strong></td>
+      <td>{getStatusBadge(item.status)}</td>
+    </tr>
+  ))}
+</tbody>
               </Table>
             </Card.Body>
           </Card>
