@@ -209,6 +209,7 @@ const Compras = () => {
 
 // Prepare evolution data for line chart with per-product costs
 // Forward-fill prices: carry the last purchase price until a new purchase is made
+// Calculate Média Geral as average of all known fuel prices (not from backend)
 const custoMedioData = (() => {
   if (!displayEvolution || displayEvolution.length === 0) return []
   
@@ -218,8 +219,7 @@ const custoMedioData = (() => {
     gasolinaAditivada: null,
     etanol: null,
     dieselS10: null,
-    dieselS500: null,
-    custoMedioGeral: null
+    dieselS500: null
   }
   
   return displayEvolution.map(day => {
@@ -232,7 +232,18 @@ const custoMedioData = (() => {
     if (day.ET != null) lastKnownPrice.etanol = parseFloat(day.ET)
     if (day.DS10 != null) lastKnownPrice.dieselS10 = parseFloat(day.DS10)
     if (day.DS500 != null) lastKnownPrice.dieselS500 = parseFloat(day.DS500)
-    if (day.avg_cost != null) lastKnownPrice.custoMedioGeral = parseFloat(day.avg_cost)
+    
+    // Calculate Média Geral as average of all known fuel prices (excluding Etanol for fuel average)
+    const fuelPrices = [
+      lastKnownPrice.gasolinaComum,
+      lastKnownPrice.gasolinaAditivada,
+      lastKnownPrice.dieselS10,
+      lastKnownPrice.dieselS500
+    ].filter(price => price != null)
+    
+    const custoMedioGeral = fuelPrices.length > 0 
+      ? fuelPrices.reduce((sum, price) => sum + price, 0) / fuelPrices.length 
+      : null
     
     return {
       dia: formattedDate,
@@ -242,7 +253,7 @@ const custoMedioData = (() => {
       etanol: lastKnownPrice.etanol,
       dieselS10: lastKnownPrice.dieselS10,
       dieselS500: lastKnownPrice.dieselS500,
-      custoMedioGeral: lastKnownPrice.custoMedioGeral
+      custoMedioGeral
     }
   })
 })()
