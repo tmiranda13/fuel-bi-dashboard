@@ -773,26 +773,26 @@ const Vendas = () => {
     <Card className="h-100 border-success">
       <Card.Body>
         <Card.Title>Breakdown por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-        <ResponsiveContainer width="100%" height={250}>
-          <PieChart>
-            <Pie
-              data={productBreakdown}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={(entry) => `${((entry.value / totalVolume) * 100).toFixed(0)}%`}
-              outerRadius={80}
-              fill="#8884d8"
-              dataKey="value"
-            >
-              {productBreakdown.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(value) => `${Math.round(value).toLocaleString('pt-BR')} L`} />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
+        <ResponsiveContainer width="100%" height={280}>
+  <PieChart>
+    <Pie
+      data={productBreakdown}
+      cx="50%"
+      cy="40%"
+      labelLine={false}
+      label={(entry) => `${((entry.value / totalVolume) * 100).toFixed(0)}%`}
+      outerRadius={70}
+      fill="#8884d8"
+      dataKey="value"
+    >
+      {productBreakdown.map((entry, index) => (
+        <Cell key={`cell-${index}`} fill={entry.color} />
+      ))}
+    </Pie>
+    <Tooltip formatter={(value) => `${Math.round(value).toLocaleString('pt-BR')} L`} />
+    <Legend verticalAlign="bottom" height={36} />
+  </PieChart>
+</ResponsiveContainer>
       </Card.Body>
     </Card>
   </Col>
