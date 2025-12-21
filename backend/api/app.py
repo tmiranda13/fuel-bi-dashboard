@@ -873,6 +873,7 @@ def get_compras_dashboard():
         product_summary = {}
         supplier_summary = {}
         daily_costs = {}
+        product_suppliers = {}  # Track suppliers per product for main supplier calculation
 
         for purchase in purchases_data:
             product_code = purchase['canonical_product_code']
@@ -902,6 +903,13 @@ def get_compras_dashboard():
             product_summary[product_code]['cost_sum'] += cost
             product_summary[product_code]['cost_count'] += 1
             product_summary[product_code]['cost_prices'].append(float(cost))
+
+            # Track suppliers per product (for main supplier calculation)
+            if product_code not in product_suppliers:
+                product_suppliers[product_code] = {}
+            if supplier not in product_suppliers[product_code]:
+                product_suppliers[product_code][supplier] = Decimal('0')
+            product_suppliers[product_code][supplier] += quantity
 
             # Supplier summary - use supplier name as key
             if supplier not in supplier_summary:
@@ -946,13 +954,19 @@ def get_compras_dashboard():
             if len(data['cost_prices']) > 1:
                 cost_std_dev = statistics.stdev(data['cost_prices'])
 
+            # Find main supplier for this product (highest volume)
+            main_supplier = 'N/A'
+            if code in product_suppliers and product_suppliers[code]:
+                main_supplier = max(product_suppliers[code].items(), key=lambda x: x[1])[0]
+
             products.append({
                 'product_code': code,
                 'product_name': data['product'],
                 'volume': float(data['volume']),
                 'avg_cost': float(avg_cost),
                 'total_cost': float(data['cost_total']),
-                'cost_std_dev': cost_std_dev  # Add standard deviation
+                'cost_std_dev': cost_std_dev,
+                'main_supplier': main_supplier  # Add main supplier
             })
             total_volume += data['volume']
             total_cost += data['cost_total']
