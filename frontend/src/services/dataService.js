@@ -127,7 +127,7 @@ export const purchasesService = {
     return data || []
   },
   
-  async getPurchasesByProduct(startDate, endDate) {
+async getPurchasesByProduct(startDate, endDate) {
     const purchases = await this.getPurchases(startDate, endDate)
     
     const byProduct = purchases.reduce((acc, p) => {
@@ -138,19 +138,57 @@ export const purchasesService = {
           product_name: p.product_name,
           volume: 0,
           total_cost: 0,
-          count: 0
+          count: 0,
+          cost_prices: [],
+          suppliers: {}  // Track volume per supplier
         }
       }
-      acc[code].volume += parseFloat(p.quantity || 0)
+      const quantity = parseFloat(p.quantity || 0)
+      acc[code].volume += quantity
       acc[code].total_cost += parseFloat(p.subtotal || 0)
       acc[code].count++
+      acc[code].cost_prices.push(parseFloat(p.cost_price || 0))
+      
+      // Track supplier volumes for this product
+      const supplier = p.supplier_name || 'Unknown'
+      if (!acc[code].suppliers[supplier]) {
+        acc[code].suppliers[supplier] = 0
+      }
+      acc[code].suppliers[supplier] += quantity
+      
       return acc
     }, {})
     
-    return Object.values(byProduct).map(p => ({
-      ...p,
-      avg_cost: p.volume > 0 ? p.total_cost / p.volume : 0
-    }))
+    return Object.values(byProduct).map(p => {
+      // Calculate standard deviation for cost variation
+      let cost_std_dev = 0
+      if (p.cost_prices.length > 1) {
+        const mean = p.cost_prices.reduce((a, b) => a + b, 0) / p.cost_prices.length
+        const squareDiffs = p.cost_prices.map(price => Math.pow(price - mean, 2))
+        const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / (p.cost_prices.length - 1)
+        cost_std_dev = Math.sqrt(avgSquareDiff)
+      }
+      
+      // Find main supplier (highest volume)
+      let main_supplier = 'N/A'
+      let maxVolume = 0
+      Object.entries(p.suppliers).forEach(([supplier, volume]) => {
+        if (volume > maxVolume) {
+          maxVolume = volume
+          main_supplier = supplier
+        }
+      })
+      
+      return {
+        product_code: p.product_code,
+        product_name: p.product_name,
+        volume: p.volume,
+        total_cost: p.total_cost,
+        avg_cost: p.volume > 0 ? p.total_cost / p.volume : 0,
+        cost_std_dev: cost_std_dev,
+        main_supplier: main_supplier
+      }
+    })
   },
   
   async getPurchasesBySupplier(startDate, endDate) {
