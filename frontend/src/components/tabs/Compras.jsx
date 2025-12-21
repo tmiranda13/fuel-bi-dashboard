@@ -301,16 +301,16 @@ const custoMedioData = (() => {
         const variacaoCusto = volumeComprado > 0 && custoMedio > 0 ? (costStdDev / custoMedio) * 100 : null
 
         return {
-          id: index + 1,
-          produto: normalizeProductName(product.product_name),
-          productCode: product.product_code,
-          volumeComprado: volumeComprado,
-          custoMedio: custoMedio,
-          custoTotal: custoTotal,
-          variacaoCusto: variacaoCusto,
-          fornecedor: 'N/A',
-          hasPurchases: volumeComprado > 0
-        }
+            id: index + 1,
+            produto: normalizeProductName(product.product_name),
+            productCode: product.product_code,
+            volumeComprado: volumeComprado,
+            custoMedio: custoMedio,
+            custoTotal: custoTotal,
+            variacaoCusto: variacaoCusto,
+            fornecedor: product.main_supplier || 'N/A',
+            hasPurchases: volumeComprado > 0
+          }
       })
     }
 
@@ -331,7 +331,7 @@ const custoMedioData = (() => {
         custoMedio: custoMedio,
         custoTotal: custoTotal,
         variacaoCusto: variacaoCusto,
-        fornecedor: 'N/A',
+        fornecedor: product.main_supplier || 'N/A',,
         hasPurchases: volumeComprado > 0
       }
     })
