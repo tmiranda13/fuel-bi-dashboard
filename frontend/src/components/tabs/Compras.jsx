@@ -331,7 +331,7 @@ const custoMedioData = (() => {
         custoMedio: custoMedio,
         custoTotal: custoTotal,
         variacaoCusto: variacaoCusto,
-        fornecedor: product.main_supplier || 'N/A',,
+        fornecedor: product.main_supplier || 'N/A',
         hasPurchases: volumeComprado > 0
       }
     })
