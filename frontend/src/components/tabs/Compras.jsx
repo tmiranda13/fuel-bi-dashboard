@@ -518,9 +518,10 @@ const custoMedioData = (() => {
                           )}
                         </td>
                         <td>
-                          <span className="text-muted">N/A</span>
-                          <MockDataBadge />
-                        </td>
+							<span className={item.fornecedor !== 'N/A' && item.fornecedor !== 'Unknown' ? 'text-success' : 'text-muted'}>
+							  {item.fornecedor}
+							</span>
+						</td>
                         <td>{noPurchases ? <Badge bg="secondary">Sem Compras</Badge> : getComprasStatusBadge(item.variacaoCusto)}</td>
                       </tr>
                     )
