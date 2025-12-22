@@ -20,6 +20,46 @@ export const useAuth = () => {
   return context
 }
 
+// Helper to check if stored token is expired
+const isTokenExpired = () => {
+  try {
+    // Find the Supabase auth token in localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.includes('sb-') && key.includes('auth-token')) {
+        const stored = localStorage.getItem(key)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          const expiresAt = parsed?.expires_at
+          if (expiresAt) {
+            const now = Math.floor(Date.now() / 1000)
+            const isExpired = now >= expiresAt
+            console.log('Token expires_at:', expiresAt, 'now:', now, 'expired:', isExpired)
+            return isExpired
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error checking token expiry:', e)
+  }
+  return false
+}
+
+// Helper to clear all auth data from localStorage
+const clearAuthStorage = () => {
+  console.log('Clearing auth storage...')
+  const keysToRemove = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key && (key.includes('supabase') || key.includes('sb-') || key.includes('auth'))) {
+      keysToRemove.push(key)
+    }
+  }
+  console.log('Removing keys:', keysToRemove)
+  keysToRemove.forEach(key => localStorage.removeItem(key))
+}
+
 const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
@@ -28,16 +68,7 @@ const AuthProvider = ({ children }) => {
   // Force clear auth state
   const forceLogout = async () => {
     console.log('Force logout - clearing auth state')
-    // Clear localStorage directly as backup
-    const keysToRemove = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && (key.includes('supabase') || key.includes('sb-') || key.includes('auth'))) {
-        keysToRemove.push(key)
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key))
-    
+    clearAuthStorage()
     try {
       await supabase.auth.signOut()
     } catch (e) {
@@ -49,23 +80,36 @@ const AuthProvider = ({ children }) => {
   
   useEffect(() => {
     let isMounted = true
-    let timeoutId = null
     
     const initAuth = async () => {
-      // Set a timeout to prevent infinite loading
-      timeoutId = setTimeout(() => {
-        if (isMounted && loading) {
-          console.error('Auth initialization timeout - forcing logout')
-          forceLogout()
-          setLoading(false)
-        }
-      }, 10000) // 10 second timeout
-      
       try {
         console.log('Starting auth initialization...')
         
-        // First try to get the session
-        const { data: { session }, error } = await supabase.auth.getSession()
+        // Check if token is expired BEFORE calling getSession
+        if (isTokenExpired()) {
+          console.log('Token is expired - clearing and redirecting to login')
+          clearAuthStorage()
+          setLoading(false)
+          return
+        }
+        
+        // Set a timeout for getSession specifically
+        const sessionPromise = supabase.auth.getSession()
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('getSession timeout')), 5000)
+        )
+        
+        let sessionResult
+        try {
+          sessionResult = await Promise.race([sessionPromise, timeoutPromise])
+        } catch (timeoutError) {
+          console.error('getSession timed out - clearing auth')
+          clearAuthStorage()
+          if (isMounted) setLoading(false)
+          return
+        }
+        
+        const { data: { session }, error } = sessionResult
         
         console.log('getSession result:', session ? 'has session' : 'no session', error ? `error: ${error.message}` : 'no error')
         
@@ -73,7 +117,7 @@ const AuthProvider = ({ children }) => {
         
         if (error) {
           console.error('Get session error:', error)
-          await forceLogout()
+          clearAuthStorage()
           setLoading(false)
           return
         }
@@ -84,8 +128,23 @@ const AuthProvider = ({ children }) => {
           return
         }
         
-        // Verify the session is still valid
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        // Verify the session is still valid with a timeout
+        const userPromise = supabase.auth.getUser()
+        const userTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('getUser timeout')), 5000)
+        )
+        
+        let userResult
+        try {
+          userResult = await Promise.race([userPromise, userTimeoutPromise])
+        } catch (timeoutError) {
+          console.error('getUser timed out - clearing auth')
+          clearAuthStorage()
+          if (isMounted) setLoading(false)
+          return
+        }
+        
+        const { data: { user }, error: userError } = userResult
         
         console.log('getUser result:', user ? 'has user' : 'no user', userError ? `error: ${userError.message}` : 'no error')
         
@@ -93,7 +152,7 @@ const AuthProvider = ({ children }) => {
         
         if (userError || !user) {
           console.error('Session invalid:', userError)
-          await forceLogout()
+          clearAuthStorage()
           setLoading(false)
           return
         }
@@ -117,7 +176,7 @@ const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error('Auth init error:', error)
         if (isMounted) {
-          await forceLogout()
+          clearAuthStorage()
           setLoading(false)
         }
       }
@@ -142,7 +201,9 @@ const AuthProvider = ({ children }) => {
         // Handle token refresh failure
         if (event === 'TOKEN_REFRESHED' && !session) {
           console.log('Token refresh failed - forcing logout')
-          await forceLogout()
+          clearAuthStorage()
+          setSession(null)
+          setProfile(null)
           setLoading(false)
           return
         }
@@ -172,9 +233,6 @@ const AuthProvider = ({ children }) => {
     
     return () => {
       isMounted = false
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-      }
       subscription?.unsubscribe()
     }
   }, [])
