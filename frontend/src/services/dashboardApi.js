@@ -1,4 +1,4 @@
-import { salesService, purchasesService, inventoryService, kpisService } from './dataService'
+import { salesService, purchasesService, inventoryService, kpisService, varianceService } from './dataService'
 
 export const PRODUCT_ORDER = ['GC', 'GA', 'ET', 'DS10', 'DS500']
 
@@ -287,6 +287,27 @@ export async function fetchEstoqueEvolution(startDate, endDate) {
   return { evolution }
 }
 
+export async function fetchVarianceData(startDate, endDate) {
+  const [evolution, summary] = await Promise.all([
+    varianceService.getVarianceEvolution(startDate, endDate),
+    varianceService.getVarianceSummary(startDate, endDate)
+  ])
+  
+  const totals = summary.reduce((acc, p) => ({
+    totalGain: acc.totalGain + p.total_gain,
+    totalLoss: acc.totalLoss + p.total_loss,
+    totalNet: acc.totalNet + p.net
+  }), { totalGain: 0, totalLoss: 0, totalNet: 0 })
+  
+  return {
+    start_date: startDate,
+    end_date: endDate,
+    evolution: evolution,
+    summary: sortProductsByStandardOrder(summary),
+    totals
+  }
+}
+
 export async function fetchKpis(kpiType = null) {
   const kpis = await kpisService.getKpis()
   if (kpiType) return kpis.filter(k => k.kpi_type === kpiType)
@@ -319,6 +340,7 @@ export default {
   fetchComprasDashboard,
   fetchEstoqueDashboard,
   fetchEstoqueEvolution,
+  fetchVarianceData,
   fetchKpis,
   fetchSettings,
   createKpi,
