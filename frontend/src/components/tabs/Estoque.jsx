@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Row, Col, Card, Table, Badge, Form, Spinner, Alert, Button } from 'react-bootstrap'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { fetchEstoqueDashboard, fetchEstoqueEvolution, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { fetchEstoqueDashboard, fetchEstoqueEvolution, fetchVarianceData, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
 
 const Estoque = () => {
   const [startDate, setStartDate] = useState(() => {
@@ -15,19 +15,32 @@ const Estoque = () => {
   const [error, setError] = useState(null)
   const [dashboardData, setDashboardData] = useState(null)
   const [evolutionData, setEvolutionData] = useState(null)
+  const [varianceData, setVarianceData] = useState(null)
   const [evolutionLoading, setEvolutionLoading] = useState(false)
+
+  // Variance chart filter state
+  const [selectedVarianceFuels, setSelectedVarianceFuels] = useState({
+    GC: true,
+    GA: true,
+    ET: true,
+    DS10: true,
+    DS500: true,
+    total: true
+  })
 
   const fetchData = async () => {
     try {
       setLoading(true)
       setEvolutionLoading(true)
       setError(null)
-      const [dashboardResult, evolutionResult] = await Promise.all([
+      const [dashboardResult, evolutionResult, varianceResult] = await Promise.all([
         fetchEstoqueDashboard(startDate, endDate),
-        fetchEstoqueEvolution(startDate, endDate)
+        fetchEstoqueEvolution(startDate, endDate),
+        fetchVarianceData(startDate, endDate)
       ])
       setDashboardData(dashboardResult)
       setEvolutionData(evolutionResult)
+      setVarianceData(varianceResult)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -55,6 +68,22 @@ const Estoque = () => {
     }
   }) || []
 
+  // Prepare variance chart data
+  const varianceChartData = varianceData?.evolution?.map(day => {
+    const [year, month, dayNum] = day.date.split('-')
+    const formattedDate = `${dayNum}/${month}`
+    return {
+      dia: formattedDate,
+      fullDate: day.date,
+      GC: parseFloat(day.GC || 0),
+      GA: parseFloat(day.GA || 0),
+      ET: parseFloat(day.ET || 0),
+      DS10: parseFloat(day.DS10 || 0),
+      DS500: parseFloat(day.DS500 || 0),
+      total: parseFloat(day.total || 0)
+    }
+  }) || []
+
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const fullDate = payload[0]?.payload?.fullDate
@@ -72,6 +101,59 @@ const Estoque = () => {
               {entry.name}: {entry.value.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} L
             </p>
           ))}
+        </div>
+      )
+    }
+    return null
+  }
+
+  // Custom tooltip for variance chart
+  const VarianceTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const fullDate = payload[0]?.payload?.fullDate
+      let dayOfWeek = ''
+      if (fullDate) {
+        const date = new Date(fullDate + 'T00:00:00')
+        const daysOfWeek = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado']
+        dayOfWeek = daysOfWeek[date.getDay()]
+      }
+      
+      // Get all data from the payload's data point
+      const dataPoint = payload[0]?.payload
+      
+      return (
+        <div style={{ backgroundColor: 'white', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}>
+          <p style={{ margin: 0, fontWeight: 'bold', marginBottom: '8px' }}>{dayOfWeek && `${dayOfWeek}, `}{label}</p>
+          {selectedVarianceFuels.GC && (
+            <p style={{ margin: '4px 0', color: '#0088FE' }}>
+              Gasolina Comum: <span style={{ color: dataPoint?.GC >= 0 ? '#28a745' : '#dc3545' }}>{dataPoint?.GC?.toFixed(1)} L</span>
+            </p>
+          )}
+          {selectedVarianceFuels.GA && (
+            <p style={{ margin: '4px 0', color: '#00C49F' }}>
+              Gasolina Aditivada: <span style={{ color: dataPoint?.GA >= 0 ? '#28a745' : '#dc3545' }}>{dataPoint?.GA?.toFixed(1)} L</span>
+            </p>
+          )}
+          {selectedVarianceFuels.ET && (
+            <p style={{ margin: '4px 0', color: '#FFBB28' }}>
+              Etanol: <span style={{ color: dataPoint?.ET >= 0 ? '#28a745' : '#dc3545' }}>{dataPoint?.ET?.toFixed(1)} L</span>
+            </p>
+          )}
+          {selectedVarianceFuels.DS10 && (
+            <p style={{ margin: '4px 0', color: '#FF8042' }}>
+              Diesel S10: <span style={{ color: dataPoint?.DS10 >= 0 ? '#28a745' : '#dc3545' }}>{dataPoint?.DS10?.toFixed(1)} L</span>
+            </p>
+          )}
+          {selectedVarianceFuels.DS500 && (
+            <p style={{ margin: '4px 0', color: '#8884D8' }}>
+              Diesel S500: <span style={{ color: dataPoint?.DS500 >= 0 ? '#28a745' : '#dc3545' }}>{dataPoint?.DS500?.toFixed(1)} L</span>
+            </p>
+          )}
+          {selectedVarianceFuels.total && (
+            <p style={{ margin: '4px 0', fontWeight: 'bold', borderTop: '1px solid #ccc', paddingTop: '4px' }}>
+              Total: <span style={{ color: dataPoint?.total >= 0 ? '#28a745' : '#dc3545' }}>{dataPoint?.total?.toFixed(1)} L</span>
+            </p>
+          )}
         </div>
       )
     }
@@ -143,6 +225,11 @@ const Estoque = () => {
   })
 
   const totalCustoEstoque = estoqueData.reduce((sum, item) => sum + item.custoEstoque, 0)
+
+  // Variance summary data
+  const varianceSummary = varianceData?.summary || []
+  const varianceTotals = varianceData?.totals || { totalGain: 0, totalLoss: 0, totalNet: 0 }
+
   return (
     <div>
       <div className="mb-4">
@@ -254,6 +341,151 @@ const Estoque = () => {
         </Col>
       </Row>
 
+      {/* Variance Chart */}
+      <Row className="mb-4">
+        <Col lg={12}>
+          <Card className="border-success">
+            <Card.Body>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <Card.Title className="mb-0">
+                    Variação de Estoque (Sobra/Falta)
+                    <small className="text-success ms-2">✓ Dados Reais</small>
+                  </Card.Title>
+                  <p className="text-muted small mb-0">Diferença entre estoque calculado e medição física dos tanques</p>
+                </div>
+                <div className="d-flex flex-wrap gap-3">
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="variance-filter-gc"
+                    label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
+                    checked={selectedVarianceFuels.GC}
+                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, GC: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="variance-filter-ga"
+                    label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
+                    checked={selectedVarianceFuels.GA}
+                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, GA: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="variance-filter-et"
+                    label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
+                    checked={selectedVarianceFuels.ET}
+                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, ET: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="variance-filter-ds10"
+                    label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
+                    checked={selectedVarianceFuels.DS10}
+                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, DS10: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="variance-filter-ds500"
+                    label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
+                    checked={selectedVarianceFuels.DS500}
+                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, DS500: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="variance-filter-total"
+                    label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
+                    checked={selectedVarianceFuels.total}
+                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, total: e.target.checked })}
+                  />
+                </div>
+              </div>
+              
+              {varianceChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={varianceChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="dia" />
+                    <YAxis domain={['auto', 'auto']} />
+                    <Tooltip content={<VarianceTooltip />} />
+                    <Legend />
+                    <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
+                    {selectedVarianceFuels.GC && <Bar dataKey="GC" fill="#0088FE" name="Gasolina Comum (L)" />}
+                    {selectedVarianceFuels.GA && <Bar dataKey="GA" fill="#00C49F" name="Gasolina Aditivada (L)" />}
+                    {selectedVarianceFuels.ET && <Bar dataKey="ET" fill="#FFBB28" name="Etanol (L)" />}
+                    {selectedVarianceFuels.DS10 && <Bar dataKey="DS10" fill="#FF8042" name="Diesel S10 (L)" />}
+                    {selectedVarianceFuels.DS500 && <Bar dataKey="DS500" fill="#8884D8" name="Diesel S500 (L)" />}
+                    {selectedVarianceFuels.total && <Bar dataKey="total" fill="#333333" name="Total (L)" />}
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <Alert variant="info">Nenhum dado de variação disponível para o período selecionado.</Alert>
+              )}
+              
+              {/* Variance Summary Legend */}
+              <div className="mt-3 d-flex justify-content-center gap-4">
+                <span><span style={{ color: '#28a745', fontWeight: 'bold' }}>● Positivo (Sobra)</span> = Medição física &gt; Estoque calculado</span>
+                <span><span style={{ color: '#dc3545', fontWeight: 'bold' }}>● Negativo (Falta)</span> = Medição física &lt; Estoque calculado</span>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Variance Summary Table */}
+      {varianceSummary.length > 0 && (
+        <Row className="mb-4">
+          <Col lg={12}>
+            <Card className="border-success">
+              <Card.Body>
+                <Card.Title>Resumo de Variação por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
+                <p className="small text-muted mb-3">
+                  Total de sobras e faltas no período selecionado
+                </p>
+                <Table responsive hover>
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Total Sobra (L)</th>
+                      <th>Total Falta (L)</th>
+                      <th>Saldo (L)</th>
+                      <th>Dias com Dados</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {varianceSummary.map((item, index) => (
+                      <tr key={index}>
+                        <td><strong>{normalizeProductName(item.product_name)}</strong></td>
+                        <td className="text-success">+{item.total_gain.toFixed(1)}</td>
+                        <td className="text-danger">{item.total_loss.toFixed(1)}</td>
+                        <td className={item.net >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                          {item.net >= 0 ? '+' : ''}{item.net.toFixed(1)}
+                        </td>
+                        <td>{item.count}</td>
+                      </tr>
+                    ))}
+                    <tr className="table-secondary">
+                      <td><strong>TOTAL</strong></td>
+                      <td className="text-success fw-bold">+{varianceTotals.totalGain.toFixed(1)}</td>
+                      <td className="text-danger fw-bold">{varianceTotals.totalLoss.toFixed(1)}</td>
+                      <td className={varianceTotals.totalNet >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                        {varianceTotals.totalNet >= 0 ? '+' : ''}{varianceTotals.totalNet.toFixed(1)}
+                      </td>
+                      <td>-</td>
+                    </tr>
+                  </tbody>
+                </Table>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
       <Row className="mb-4">
         <Col lg={12}>
           <Card className="border-success">
@@ -324,23 +556,28 @@ const Estoque = () => {
       <Card bg="light" className="mt-3">
         <Card.Body>
           <Row>
-            <Col md={6}>
+            <Col md={4}>
               <h6>✓ Dados Reais (Fonte: API)</h6>
               <ul className="small mb-0">
                 <li>Capacidade do Tanque (medição física)</li>
                 <li>Estoque Atual (medição física do tanque)</li>
                 <li>Ocupação % (Estoque / Capacidade)</li>
-                <li>Entrada no Período Selecionado</li>
-                <li>Saída no Período Selecionado</li>
                 <li>Dias de Autonomia (Estoque / VMD)</li>
                 <li>Custo Médio (R$/L)</li>
                 <li>Custo do Estoque (Custo Médio × Estoque)</li>
-                <li>Status (baseado em ocupação)</li>
-                <li>Alertas de Estoque Baixo/Crítico</li>
               </ul>
             </Col>
-            <Col md={6}>
-              <h6>✓ Evolução de Estoque (Calculado)</h6>
+            <Col md={4}>
+              <h6>✓ Variação de Estoque</h6>
+              <ul className="small mb-0">
+                <li>Diferença = Medição Física - Estoque Calculado</li>
+                <li>Positivo (Sobra) = Mais combustível que o esperado</li>
+                <li>Negativo (Falta) = Menos combustível que o esperado</li>
+                <li>Extraído do relatório RESUMO DO DIA</li>
+              </ul>
+            </Col>
+            <Col md={4}>
+              <h6>✓ Evolução de Estoque</h6>
               <ul className="small mb-0">
                 <li>Calculado a partir de compras e vendas</li>
                 <li>Ponto final = medição física atual dos tanques</li>
@@ -357,7 +594,6 @@ const Estoque = () => {
                 <li><strong className="text-warning">Baixo:</strong> Entre 40% e 70% de ocupação - Programar compra</li>
                 <li><strong className="text-success">Adequado:</strong> Acima de 70% de ocupação - Estoque normal</li>
               </ul>
-              <p className="text-muted mt-3 mb-0"><strong>Cálculo:</strong> Ocupação = Estoque Atual / Capacidade do Tanque</p>
             </Col>
           </Row>
         </Card.Body>
