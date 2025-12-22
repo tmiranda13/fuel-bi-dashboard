@@ -24,7 +24,7 @@ const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   
-  // Fetch profile directly using session's user id
+  // Fetch profile directly using user id
   const fetchProfile = async (userId) => {
     if (!userId) return null
     
@@ -60,59 +60,73 @@ const AuthProvider = ({ children }) => {
     }
   }
   
+  // Simple logout - clears everything
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut()
+    } catch (e) {
+      console.error('Logout error:', e)
+    }
+    setSession(null)
+    setProfile(null)
+  }
+  
   useEffect(() => {
     let isMounted = true
     
-    // Initialize auth state
     const initAuth = async () => {
       try {
-        // Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession()
+        // Simple session check - no complex validation
+        const { data: { session } } = await supabase.auth.getSession()
         
-        if (error) {
-          console.error('getSession error:', error)
-          if (isMounted) setLoading(false)
-          return
-        }
+        if (!isMounted) return
         
         if (session?.user) {
-          if (isMounted) {
-            setSession(session)
-            const profile = await fetchProfile(session.user.id)
-            setProfile(profile)
+          // Check if token is expired (with 5 min buffer)
+          const expiresAt = session.expires_at
+          const now = Math.floor(Date.now() / 1000)
+          const buffer = 300 // 5 minutes
+          
+          if (expiresAt && now >= (expiresAt - buffer)) {
+            console.log('Session expired, redirecting to login')
+            await logout()
+            setLoading(false)
+            return
           }
+          
+          setSession(session)
+          const profile = await fetchProfile(session.user.id)
+          if (isMounted) setProfile(profile)
         }
         
         if (isMounted) setLoading(false)
       } catch (e) {
-        console.error('Init auth error:', e)
-        if (isMounted) setLoading(false)
+        console.error('Auth init error:', e)
+        if (isMounted) {
+          await logout()
+          setLoading(false)
+        }
       }
     }
     
     initAuth()
     
-    // Listen for auth changes
+    // Listen for sign in/out only (not token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth event:', event)
-        
+      async (event, newSession) => {
         if (!isMounted) return
         
-        if (event === 'SIGNED_OUT' || !session) {
-          setSession(null)
-          setProfile(null)
-          return
+        console.log('Auth event:', event)
+        
+        if (event === 'SIGNED_IN' && newSession?.user) {
+          setSession(newSession)
+          const profile = await fetchProfile(newSession.user.id)
+          if (isMounted) setProfile(profile)
         }
         
-        if (session?.user) {
-          setSession(session)
-          
-          // Only fetch profile on sign in events, not token refresh
-          if (event === 'SIGNED_IN') {
-            const profile = await fetchProfile(session.user.id)
-            setProfile(profile)
-          }
+        if (event === 'SIGNED_OUT') {
+          setSession(null)
+          setProfile(null)
         }
       }
     )
@@ -122,12 +136,6 @@ const AuthProvider = ({ children }) => {
       subscription?.unsubscribe()
     }
   }, [])
-  
-  const logout = async () => {
-    await supabase.auth.signOut()
-    setSession(null)
-    setProfile(null)
-  }
   
   const value = {
     session,
