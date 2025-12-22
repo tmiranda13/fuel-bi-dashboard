@@ -18,6 +18,16 @@ const Estoque = () => {
   const [varianceData, setVarianceData] = useState(null)
   const [evolutionLoading, setEvolutionLoading] = useState(false)
 
+  // Stock evolution chart filter state
+  const [selectedStockFuels, setSelectedStockFuels] = useState({
+    GC: true,
+    GA: true,
+    ET: true,
+    DS10: true,
+    DS500: true,
+    total: true
+  })
+
   // Variance chart filter state
   const [selectedVarianceFuels, setSelectedVarianceFuels] = useState({
     GC: true,
@@ -347,11 +357,65 @@ const Estoque = () => {
         <Col lg={12}>
           <Card className="border-success">
             <Card.Body>
-              <Card.Title>Evolução de Estoque <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-              <p className="small text-muted mb-3">
-                Estoque diário calculado a partir das compras (entradas) e vendas (saídas).
-                O estoque atual é baseado na medição física dos tanques.
-              </p>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <Card.Title className="mb-0">Evolução de Estoque <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
+                  <p className="small text-muted mb-0">
+                    Estoque diário calculado a partir das compras (entradas) e vendas (saídas).
+                    O estoque atual é baseado na medição física dos tanques.
+                  </p>
+                </div>
+                <div className="d-flex flex-wrap gap-3">
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="stock-filter-gc"
+                    label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
+                    checked={selectedStockFuels.GC}
+                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, GC: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="stock-filter-ga"
+                    label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
+                    checked={selectedStockFuels.GA}
+                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, GA: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="stock-filter-et"
+                    label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
+                    checked={selectedStockFuels.ET}
+                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, ET: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="stock-filter-ds10"
+                    label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
+                    checked={selectedStockFuels.DS10}
+                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, DS10: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="stock-filter-ds500"
+                    label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
+                    checked={selectedStockFuels.DS500}
+                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, DS500: e.target.checked })}
+                  />
+                  <Form.Check
+                    inline
+                    type="checkbox"
+                    id="stock-filter-total"
+                    label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
+                    checked={selectedStockFuels.total}
+                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, total: e.target.checked })}
+                  />
+                </div>
+              </div>
               {evolutionLoading ? (
                 <div className="text-center py-5">
                   <Spinner animation="border" size="sm" />
@@ -365,12 +429,12 @@ const Estoque = () => {
                     <YAxis />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend />
-                    <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />
-                    <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />
-                    <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />
-                    <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />
-                    <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />
-                    <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />
+                    {selectedStockFuels.GC && <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />}
+                    {selectedStockFuels.GA && <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />}
+                    {selectedStockFuels.ET && <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />}
+                    {selectedStockFuels.DS10 && <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />}
+                    {selectedStockFuels.DS500 && <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />}
+                    {selectedStockFuels.total && <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
