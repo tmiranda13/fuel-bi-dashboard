@@ -36,6 +36,15 @@ const Compras = () => {
       setError(null)
       const data = await fetchComprasDashboard(startDate, endDate)
       setDashboardData(data)
+      
+      // Reset product selection when data changes
+      // Keep only products that exist in the new data
+      const newProductCodes = data?.products?.map(p => p.product_code) || []
+      setSelectedProducts(prev => {
+        if (prev.length === 0) return [] // If "all" was selected, keep it as "all"
+        const validSelections = prev.filter(code => newProductCodes.includes(code))
+        return validSelections
+      })
     } catch (err) {
       setError(err.message)
     } finally {
