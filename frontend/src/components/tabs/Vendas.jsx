@@ -398,10 +398,14 @@ const Vendas = () => {
                   <Form.Control
                     type="date"
                     value={startDate}
+                    max={endDate}
+                    onKeyDown={(e) => e.preventDefault()}
                     onChange={(e) => {
                       const newDate = e.target.value
-                      setStartDate(newDate)
-                      localStorage.setItem('vendas_startDate', newDate)
+                      if (newDate && newDate <= endDate) {
+                        setStartDate(newDate)
+                        localStorage.setItem('vendas_startDate', newDate)
+                      }
                     }}
                   />
                 </Form.Group>
@@ -412,10 +416,14 @@ const Vendas = () => {
                   <Form.Control
                     type="date"
                     value={endDate}
+                    min={startDate}
+                    onKeyDown={(e) => e.preventDefault()}
                     onChange={(e) => {
                       const newDate = e.target.value
-                      setEndDate(newDate)
-                      localStorage.setItem('vendas_endDate', newDate)
+                      if (newDate && newDate >= startDate) {
+                        setEndDate(newDate)
+                        localStorage.setItem('vendas_endDate', newDate)
+                      }
                     }}
                   />
                 </Form.Group>
