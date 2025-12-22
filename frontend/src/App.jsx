@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, createContext, useContext, useCallback } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Spinner, Container } from 'react-bootstrap'
 import { supabase } from './services/supabase'
@@ -23,7 +23,6 @@ export const useAuth = () => {
 // Helper to check if stored token is expired
 const isTokenExpired = () => {
   try {
-    // Find the Supabase auth token in localStorage
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
       if (key && key.includes('sb-') && key.includes('auth-token')) {
@@ -66,7 +65,7 @@ const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   
   // Force clear auth state
-  const forceLogout = async () => {
+  const forceLogout = useCallback(async () => {
     console.log('Force logout - clearing auth state')
     clearAuthStorage()
     try {
@@ -76,10 +75,37 @@ const AuthProvider = ({ children }) => {
     }
     setSession(null)
     setProfile(null)
-  }
+  }, [])
+
+  // Proactive token refresh function
+  const refreshSession = useCallback(async () => {
+    try {
+      console.log('Proactively refreshing session...')
+      const { data, error } = await supabase.auth.refreshSession()
+      
+      if (error) {
+        console.error('Session refresh failed:', error)
+        // If refresh fails, force logout
+        await forceLogout()
+        return false
+      }
+      
+      if (data.session) {
+        console.log('Session refreshed successfully')
+        setSession(data.session)
+        return true
+      }
+      
+      return false
+    } catch (e) {
+      console.error('Session refresh error:', e)
+      return false
+    }
+  }, [forceLogout])
   
   useEffect(() => {
     let isMounted = true
+    let refreshInterval = null
     
     const initAuth = async () => {
       try {
@@ -184,9 +210,18 @@ const AuthProvider = ({ children }) => {
     
     initAuth()
     
+    // Set up proactive token refresh every 4 minutes (240000ms)
+    // This ensures the token stays fresh even if auto-refresh fails
+    refreshInterval = setInterval(() => {
+      if (session) {
+        console.log('Running scheduled token refresh...')
+        refreshSession()
+      }
+    }, 240000) // 4 minutes
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth event:', event, session ? 'has session' : 'no session')
+      async (event, newSession) => {
+        console.log('Auth event:', event, newSession ? 'has session' : 'no session')
         
         if (!isMounted) return
         
@@ -199,7 +234,7 @@ const AuthProvider = ({ children }) => {
         }
         
         // Handle token refresh failure
-        if (event === 'TOKEN_REFRESHED' && !session) {
+        if (event === 'TOKEN_REFRESHED' && !newSession) {
           console.log('Token refresh failed - forcing logout')
           clearAuthStorage()
           setSession(null)
@@ -209,8 +244,8 @@ const AuthProvider = ({ children }) => {
         }
         
         // Handle successful auth events
-        if (session) {
-          setSession(session)
+        if (newSession) {
+          setSession(newSession)
           
           // Only fetch profile on sign in, not on every token refresh
           if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || !profile) {
@@ -231,11 +266,34 @@ const AuthProvider = ({ children }) => {
       }
     )
     
+    // Also refresh on window focus (user comes back to tab)
+    const handleFocus = () => {
+      if (session) {
+        console.log('Window focused - refreshing session')
+        refreshSession()
+      }
+    }
+    window.addEventListener('focus', handleFocus)
+    
+    // Also refresh on visibility change (tab becomes visible)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && session) {
+        console.log('Tab visible - refreshing session')
+        refreshSession()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
     return () => {
       isMounted = false
+      if (refreshInterval) {
+        clearInterval(refreshInterval)
+      }
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       subscription?.unsubscribe()
     }
-  }, [])
+  }, [session, refreshSession])
   
   const logout = async () => {
     await authService.logout()
@@ -251,6 +309,7 @@ const AuthProvider = ({ children }) => {
     isLoading: loading,
     logout,
     forceLogout,
+    refreshSession,
     companyId: profile?.company_id,
     companyName: profile?.companies?.display_name || profile?.companies?.company_name,
     userRole: profile?.role,
