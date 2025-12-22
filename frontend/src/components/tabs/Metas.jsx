@@ -11,8 +11,28 @@ const InputCell = memo(({ kpiType, productCode, unit, value, onChange, placehold
       <Form.Control
         type="number"
         size="sm"
+        min="0"
         value={value}
-        onChange={(e) => onChange(kpiType, productCode, e.target.value)}
+        onChange={(e) => {
+          const newValue = e.target.value
+          // Prevent negative values
+          if (newValue === '' || parseFloat(newValue) >= 0) {
+            onChange(kpiType, productCode, newValue)
+          }
+        }}
+        onKeyDown={(e) => {
+          // Block minus sign and 'e' for scientific notation
+          if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+            e.preventDefault()
+          }
+        }}
+        onPaste={(e) => {
+          // Check pasted content for negative values
+          const pastedText = e.clipboardData.getData('text')
+          if (pastedText.includes('-')) {
+            e.preventDefault()
+          }
+        }}
         placeholder={placeholder}
         style={{ width: '120px' }}
       />
