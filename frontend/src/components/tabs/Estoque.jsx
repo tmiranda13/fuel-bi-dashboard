@@ -289,6 +289,7 @@ const Estoque = () => {
         </Row>
       </div>
 
+      {/* 1. Status de Estoque por Produto */}
       <Row className="mb-4">
         <Col lg={12}>
           <Card className="border-success">
@@ -341,7 +342,46 @@ const Estoque = () => {
         </Col>
       </Row>
 
-      {/* Variance Chart */}
+      {/* 2. Evolução de Estoque (MOVED UP) */}
+      <Row className="mb-4">
+        <Col lg={12}>
+          <Card className="border-success">
+            <Card.Body>
+              <Card.Title>Evolução de Estoque <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
+              <p className="small text-muted mb-3">
+                Estoque diário calculado a partir das compras (entradas) e vendas (saídas).
+                O estoque atual é baseado na medição física dos tanques.
+              </p>
+              {evolutionLoading ? (
+                <div className="text-center py-5">
+                  <Spinner animation="border" size="sm" />
+                  <span className="ms-2">Carregando evolução...</span>
+                </div>
+              ) : stockEvolutionData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={stockEvolutionData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="dia" />
+                    <YAxis />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />
+                    <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />
+                    <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />
+                    <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />
+                    <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />
+                    <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <Alert variant="info">Nenhum dado de evolução disponível para o período selecionado.</Alert>
+              )}
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 3. Variação de Estoque (Sobra/Falta) */}
       <Row className="mb-4">
         <Col lg={12}>
           <Card className="border-success">
@@ -437,7 +477,7 @@ const Estoque = () => {
         </Col>
       </Row>
 
-      {/* Variance Summary Table */}
+      {/* 4. Resumo de Variação por Produto */}
       {varianceSummary.length > 0 && (
         <Row className="mb-4">
           <Col lg={12}>
@@ -454,7 +494,6 @@ const Estoque = () => {
                       <th>Total Sobra (L)</th>
                       <th>Total Falta (L)</th>
                       <th>Saldo (L)</th>
-                      <th>Dias com Dados</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -466,7 +505,6 @@ const Estoque = () => {
                         <td className={item.net >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
                           {item.net >= 0 ? '+' : ''}{item.net.toFixed(1)}
                         </td>
-                        <td>{item.count}</td>
                       </tr>
                     ))}
                     <tr className="table-secondary">
@@ -476,7 +514,6 @@ const Estoque = () => {
                       <td className={varianceTotals.totalNet >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
                         {varianceTotals.totalNet >= 0 ? '+' : ''}{varianceTotals.totalNet.toFixed(1)}
                       </td>
-                      <td>-</td>
                     </tr>
                   </tbody>
                 </Table>
@@ -486,44 +523,7 @@ const Estoque = () => {
         </Row>
       )}
 
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>Evolução de Estoque <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-              <p className="small text-muted mb-3">
-                Estoque diário calculado a partir das compras (entradas) e vendas (saídas).
-                O estoque atual é baseado na medição física dos tanques.
-              </p>
-              {evolutionLoading ? (
-                <div className="text-center py-5">
-                  <Spinner animation="border" size="sm" />
-                  <span className="ms-2">Carregando evolução...</span>
-                </div>
-              ) : stockEvolutionData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={stockEvolutionData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="dia" />
-                    <YAxis />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />
-                    <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />
-                    <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />
-                    <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />
-                    <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />
-                    <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <Alert variant="info">Nenhum dado de evolução disponível para o período selecionado.</Alert>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
+      {/* 5. Alertas de Estoque */}
       <Row className="mb-4">
         <Col lg={12}>
           <Card border={estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length > 0 ? 'danger' : 'success'}>
