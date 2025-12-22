@@ -25,17 +25,56 @@ const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   
+  // Force clear auth state and redirect to login
+  const forceLogout = async () => {
+    console.log('Force logout - clearing auth state')
+    try {
+      await supabase.auth.signOut()
+    } catch (e) {
+      console.error('Sign out error:', e)
+    }
+    setSession(null)
+    setProfile(null)
+  }
+  
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const session = await authService.getSession()
-        setSession(session)
+        // First try to get the session
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Get session error:', error)
+          await forceLogout()
+          setLoading(false)
+          return
+        }
+        
         if (session) {
-          const profile = await authService.getProfile()
-          setProfile(profile)
+          // Verify the session is still valid by making a test request
+          const { error: userError } = await supabase.auth.getUser()
+          
+          if (userError) {
+            console.error('Session invalid:', userError)
+            await forceLogout()
+            setLoading(false)
+            return
+          }
+          
+          setSession(session)
+          try {
+            const profile = await authService.getProfile()
+            setProfile(profile)
+          } catch (profileError) {
+            console.error('Profile fetch error:', profileError)
+            // Session is valid but profile fetch failed - might be RLS issue
+            // Don't force logout, just set profile to null
+            setProfile(null)
+          }
         }
       } catch (error) {
         console.error('Auth init error:', error)
+        await forceLogout()
       } finally {
         setLoading(false)
       }
@@ -45,13 +84,35 @@ const AuthProvider = ({ children }) => {
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth event:', event)
-        setSession(session)
-        if (session) {
-          const profile = await authService.getProfile()
-          setProfile(profile)
-        } else {
+        console.log('Auth event:', event, session ? 'has session' : 'no session')
+        
+        // Handle sign out
+        if (event === 'SIGNED_OUT') {
+          setSession(null)
           setProfile(null)
+          return
+        }
+        
+        // Handle token refresh failure
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          console.log('Token refresh failed - forcing logout')
+          await forceLogout()
+          return
+        }
+        
+        // Handle successful auth events
+        if (session) {
+          setSession(session)
+          
+          // Only fetch profile on sign in, not on every token refresh
+          if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || !profile) {
+            try {
+              const newProfile = await authService.getProfile()
+              setProfile(newProfile)
+            } catch (error) {
+              console.error('Profile fetch error on auth change:', error)
+            }
+          }
         }
       }
     )
@@ -74,6 +135,7 @@ const AuthProvider = ({ children }) => {
     isAuthenticated: !!session,
     isLoading: loading,
     logout,
+    forceLogout, // Expose this for components that need to handle auth errors
     companyId: profile?.company_id,
     companyName: profile?.companies?.display_name || profile?.companies?.company_name,
     userRole: profile?.role,
