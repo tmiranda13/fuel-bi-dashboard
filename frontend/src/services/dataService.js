@@ -414,3 +414,81 @@ export const companyService = {
     return data?.settings_data || {}
   }
 }
+
+// ============================================================
+// INVENTORY VARIANCE SERVICE
+// ============================================================
+
+export const varianceService = {
+  async getVariance(startDate, endDate) {
+    let query = supabase
+      .from('daily_inventory_variance')
+      .select('*')
+      .order('variance_date', { ascending: true })
+    
+    if (startDate) query = query.gte('variance_date', startDate)
+    if (endDate) query = query.lte('variance_date', endDate)
+    
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
+  },
+  
+  async getVarianceEvolution(startDate, endDate) {
+    const variance = await this.getVariance(startDate, endDate)
+    
+    const byDate = variance.reduce((acc, v) => {
+      const date = v.variance_date
+      if (!acc[date]) {
+        acc[date] = {
+          date,
+          GC: 0, GA: 0, ET: 0, DS10: 0, DS500: 0,
+          total: 0
+        }
+      }
+      
+      const code = v.product_code
+      const varianceValue = parseFloat(v.variance || 0)
+      
+      if (acc[date][code] !== undefined) {
+        acc[date][code] = varianceValue
+      }
+      acc[date].total += varianceValue
+      
+      return acc
+    }, {})
+    
+    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
+  },
+  
+  async getVarianceSummary(startDate, endDate) {
+    const variance = await this.getVariance(startDate, endDate)
+    
+    const byProduct = variance.reduce((acc, v) => {
+      const code = v.product_code
+      if (!acc[code]) {
+        acc[code] = {
+          product_code: code,
+          product_name: v.product_name,
+          total_gain: 0,
+          total_loss: 0,
+          net: 0,
+          count: 0
+        }
+      }
+      
+      const varianceValue = parseFloat(v.variance || 0)
+      if (varianceValue > 0) {
+        acc[code].total_gain += varianceValue
+      } else {
+        acc[code].total_loss += varianceValue
+      }
+      acc[code].net += varianceValue
+      acc[code].count++
+      
+      return acc
+    }, {})
+    
+    return Object.values(byProduct)
+  }
+}
