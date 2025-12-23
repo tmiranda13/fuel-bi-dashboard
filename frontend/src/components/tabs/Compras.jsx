@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Row, Col, Card, Form, Table, Badge, Spinner, Alert, Button, Dropdown } from 'react-bootstrap'
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Scatter, ComposedChart } from 'recharts'
 import { fetchComprasDashboard, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
 import MockDataBadge, { MockDataCard } from '../MockDataBadge'
 
@@ -219,6 +219,7 @@ const Compras = () => {
 // Prepare evolution data for line chart with per-product costs
 // Forward-fill prices: carry the last purchase price until a new purchase is made
 // Calculate Média Geral as average of all known fuel prices (not from backend)
+// Track actual purchase days to show dots only on purchase dates
 const custoMedioData = (() => {
   if (!displayEvolution || displayEvolution.length === 0) return []
   
@@ -234,6 +235,15 @@ const custoMedioData = (() => {
   return displayEvolution.map(day => {
     const [year, month, dayNum] = day.date.split('-')
     const formattedDate = `${dayNum}/${month}`
+    
+    // Track if this day has an actual purchase for each product
+    const hasPurchase = {
+      gasolinaComum: day.GC != null,
+      gasolinaAditivada: day.GA != null,
+      etanol: day.ET != null,
+      dieselS10: day.DS10 != null,
+      dieselS500: day.DS500 != null
+    }
     
     // Update last known price only when there's a new purchase (non-null value)
     if (day.GC != null) lastKnownPrice.gasolinaComum = parseFloat(day.GC)
@@ -254,6 +264,9 @@ const custoMedioData = (() => {
       ? fuelPrices.reduce((sum, price) => sum + price, 0) / fuelPrices.length 
       : null
     
+    // Check if any purchase happened today for Média Geral dot
+    const anyPurchaseToday = Object.values(hasPurchase).some(v => v)
+    
     return {
       dia: formattedDate,
       fullDate: day.date,
@@ -262,7 +275,14 @@ const custoMedioData = (() => {
       etanol: lastKnownPrice.etanol,
       dieselS10: lastKnownPrice.dieselS10,
       dieselS500: lastKnownPrice.dieselS500,
-      custoMedioGeral
+      custoMedioGeral,
+      // Store actual purchase values for dots (null if no purchase that day)
+      gcPurchase: hasPurchase.gasolinaComum ? lastKnownPrice.gasolinaComum : null,
+      gaPurchase: hasPurchase.gasolinaAditivada ? lastKnownPrice.gasolinaAditivada : null,
+      etPurchase: hasPurchase.etanol ? lastKnownPrice.etanol : null,
+      ds10Purchase: hasPurchase.dieselS10 ? lastKnownPrice.dieselS10 : null,
+      ds500Purchase: hasPurchase.dieselS500 ? lastKnownPrice.dieselS500 : null,
+      mediaPurchase: anyPurchaseToday ? custoMedioGeral : null
     }
   })
 })()
@@ -655,19 +675,26 @@ const custoMedioData = (() => {
           </div>
         </div>
         <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={custoMedioData}>
+          <ComposedChart data={custoMedioData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="dia" />
             <YAxis domain={['auto', 'auto']} />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
+            {/* Step lines showing price over time */}
             {selectedChartFuels.gasolinaComum && <Line type="stepAfter" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.gasolinaAditivada && <Line type="stepAfter" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.etanol && <Line type="stepAfter" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.dieselS10 && <Line type="stepAfter" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.dieselS500 && <Line type="stepAfter" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.custoMedioGeral && <Line type="stepAfter" dataKey="custoMedioGeral" stroke="#000000" strokeWidth={3} name="Média Geral (R$/L)" dot={false} connectNulls />}
-          </LineChart>
+            {/* Scatter dots showing actual purchase dates */}
+            {selectedChartFuels.gasolinaComum && <Scatter dataKey="gcPurchase" fill="#0088FE" name="Compra GC" shape="circle" legendType="none" />}
+            {selectedChartFuels.gasolinaAditivada && <Scatter dataKey="gaPurchase" fill="#00C49F" name="Compra GA" shape="circle" legendType="none" />}
+            {selectedChartFuels.etanol && <Scatter dataKey="etPurchase" fill="#FFBB28" name="Compra ET" shape="circle" legendType="none" />}
+            {selectedChartFuels.dieselS10 && <Scatter dataKey="ds10Purchase" fill="#FF8042" name="Compra DS10" shape="circle" legendType="none" />}
+            {selectedChartFuels.dieselS500 && <Scatter dataKey="ds500Purchase" fill="#8884D8" name="Compra DS500" shape="circle" legendType="none" />}
+          </ComposedChart>
         </ResponsiveContainer>
       </Card.Body>
     </Card>
