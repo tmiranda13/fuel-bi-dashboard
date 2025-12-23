@@ -435,15 +435,18 @@ const custoMedioData = (() => {
                   />
                 </Form.Group>
               </Col>
-              <Col md={4} className="d-flex align-items-end">
-                <Button
-                  variant="primary"
-                  className="w-100"
-                  onClick={fetchData}
-                  disabled={loading}
-                >
-                  {loading ? 'Carregando...' : 'Atualizar'}
-                </Button>
+              <Col md={4}>
+                <Form.Group>
+                  <Form.Label className="small mb-1">&nbsp;</Form.Label>
+                  <Button
+                    variant="primary"
+                    className="w-100 d-block"
+                    onClick={fetchData}
+                    disabled={loading}
+                  >
+                    {loading ? 'Carregando...' : 'Atualizar'}
+                  </Button>
+                </Form.Group>
               </Col>
             </Row>
             {/* Second Row: Product and Supplier Filters */}
