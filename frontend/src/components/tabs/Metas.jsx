@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, memo } from 'react'
 import { Row, Col, Card, Badge, Form, Button, Table, Alert, Spinner } from 'react-bootstrap'
 import { sortProductsByStandardOrder, PRODUCT_ORDER, PRODUCT_NAMES } from '../../services/dashboardApi'
 import { kpisService } from '../../services/dataService'
-import { supabase } from '../../services/supabase'
+import { useAuth } from '../../App'
 
 // Input cell component
 const InputCell = memo(({ kpiType, productCode, unit, value, onChange, placeholder, existingKpi }) => {
@@ -49,6 +49,7 @@ const InputCell = memo(({ kpiType, productCode, unit, value, onChange, placehold
 })
 
 const Metas = () => {
+  const { companyId } = useAuth()
   const [kpis, setKpis] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -193,9 +194,7 @@ const Metas = () => {
     if (existingKpi) {
       return await kpisService.updateKpi(existingKpi.id, payload)
     } else {
-      // Pass companyId to avoid multiple getSession calls
-      const { data: { session } } = await supabase.auth.getSession()
-      const companyId = session?.user?.app_metadata?.company_id
+      // Use companyId from auth context
       return await kpisService.createKpi(payload, companyId)
     }
   }
@@ -212,10 +211,7 @@ const Metas = () => {
     setSuccess(null)
 
 try {
-      // Get company_id once before all saves
-      const { data: { session } } = await supabase.auth.getSession()
-      const companyId = session?.user?.app_metadata?.company_id
-      
+      // Use companyId from auth context
       if (!companyId) {
         throw new Error('Session expired. Please login again.')
       }
