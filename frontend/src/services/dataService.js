@@ -371,3 +371,88 @@ export const companyService = {
     return data?.settings_data || {}
   }
 }
+
+// ============================================================
+// VARIANCE SERVICE (Inventory Variance / Sobra-Falta)
+// ============================================================
+
+export const varianceService = {
+  async getVarianceData(startDate, endDate) {
+    let query = supabase
+      .from('daily_inventory_variance')
+      .select('*')
+      .order('measurement_date', { ascending: true })
+    
+    if (startDate) query = query.gte('measurement_date', startDate)
+    if (endDate) query = query.lte('measurement_date', endDate)
+    
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
+  },
+  
+  async getVarianceEvolution(startDate, endDate) {
+    const variance = await this.getVarianceData(startDate, endDate)
+    
+    // Group by date, showing variance per product
+    const byDate = variance.reduce((acc, v) => {
+      const date = v.measurement_date
+      if (!date) return acc
+      
+      if (!acc[date]) {
+        acc[date] = {
+          date,
+          GC: null, GA: null, ET: null, DS10: null, DS500: null,
+          total: 0
+        }
+      }
+      
+      const code = v.product_code
+      const varianceValue = parseFloat(v.variance_liters || 0)
+      
+      if (code && acc[date][code] !== undefined) {
+        acc[date][code] = varianceValue
+      }
+      acc[date].total += varianceValue
+      
+      return acc
+    }, {})
+    
+    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
+  },
+  
+  async getVarianceSummary(startDate, endDate) {
+    const variance = await this.getVarianceData(startDate, endDate)
+    
+    // Group by product, calculating totals
+    const byProduct = variance.reduce((acc, v) => {
+      const code = v.product_code
+      if (!code) return acc
+      
+      if (!acc[code]) {
+        acc[code] = {
+          product_code: code,
+          product_name: v.product_name,
+          total_gain: 0,
+          total_loss: 0,
+          net: 0,
+          count: 0
+        }
+      }
+      
+      const varianceValue = parseFloat(v.variance_liters || 0)
+      
+      if (varianceValue > 0) {
+        acc[code].total_gain += varianceValue
+      } else {
+        acc[code].total_loss += Math.abs(varianceValue)
+      }
+      acc[code].net += varianceValue
+      acc[code].count++
+      
+      return acc
+    }, {})
+    
+    return Object.values(byProduct)
+  }
+}
