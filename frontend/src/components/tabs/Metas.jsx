@@ -48,6 +48,26 @@ const InputCell = memo(({ kpiType, productCode, unit, value, onChange, placehold
   )
 })
 
+// Read-only total cell component (auto-calculated)
+const ReadOnlyTotalCell = memo(({ value, unit }) => {
+  const displayValue = value > 0 ? value.toLocaleString('pt-BR') : ''
+  return (
+    <div className="d-flex align-items-center gap-1">
+      <Form.Control
+        type="text"
+        size="sm"
+        value={displayValue}
+        readOnly
+        disabled
+        style={{ width: '120px', backgroundColor: '#e9ecef' }}
+      />
+      <span className="text-muted small">
+        {unit === 'liters' ? 'L' : unit === 'percent' ? '%' : 'R$'}
+      </span>
+    </div>
+  )
+})
+
 const Metas = () => {
   const { companyId } = useAuth()
   const [kpis, setKpis] = useState([])
@@ -217,6 +237,10 @@ try {
       }
 
       const savePromises = []
+      
+      // Track if we need to save totals
+      let hasSalesVolumeChanges = false
+      let hasRevenueChanges = false
 
       for (const key of modifiedKeys) {
         const value = editValues[key]
@@ -226,6 +250,7 @@ try {
         if (key.startsWith('sales_volume_')) {
           kpiType = 'sales_volume'
           productCode = key.replace('sales_volume_', '')
+          if (productCode !== 'total') hasSalesVolumeChanges = true
         } else if (key.startsWith('margin_')) {
           kpiType = 'margin'
           productCode = key.replace('margin_', '')
@@ -235,7 +260,13 @@ try {
         } else if (key.startsWith('revenue_')) {
           kpiType = 'revenue'
           productCode = key.replace('revenue_', '')
+          if (productCode !== 'total') hasRevenueChanges = true
         } else {
+          continue
+        }
+
+        // Skip 'total' for sales_volume and revenue - we'll save calculated totals
+        if ((kpiType === 'sales_volume' || kpiType === 'revenue') && productCode === 'total') {
           continue
         }
 
@@ -252,6 +283,30 @@ try {
         }
         
         savePromises.push(saveWithCatch())
+      }
+
+      // Calculate and save totals for sales_volume if any product was modified
+      if (hasSalesVolumeChanges) {
+        const totalVolume = products.reduce((sum, product) => {
+          const key = getKpiKey('sales_volume', product.product_code)
+          return sum + parseFloat(editValues[key] || 0)
+        }, 0)
+        
+        if (totalVolume > 0) {
+          savePromises.push(saveKpi('sales_volume', null, totalVolume.toString()))
+        }
+      }
+
+      // Calculate and save totals for revenue if any product was modified
+      if (hasRevenueChanges) {
+        const totalRevenue = products.reduce((sum, product) => {
+          const key = getKpiKey('revenue', product.product_code)
+          return sum + parseFloat(editValues[key] || 0)
+        }, 0)
+        
+        if (totalRevenue > 0) {
+          savePromises.push(saveKpi('revenue', null, totalRevenue.toString()))
+        }
       }
 
       if (savePromises.length === 0) {
@@ -359,6 +414,19 @@ try {
       />
     )
   }
+
+  // Calculate total for a KPI type by summing all product values
+  const calculateTotal = (kpiType) => {
+    return products.reduce((sum, product) => {
+      const key = getKpiKey(kpiType, product.product_code)
+      const value = parseFloat(editValues[key] || 0)
+      return sum + value
+    }, 0)
+  }
+
+  // Get calculated totals for sales_volume and revenue
+  const salesVolumeTotal = calculateTotal('sales_volume')
+  const revenueTotal = calculateTotal('revenue')
 
   // Previous month for copy feature
   const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1
@@ -473,7 +541,7 @@ try {
                 <tbody>
                   <tr className="table-light">
                     <td><strong>TOTAL</strong></td>
-                    <td>{renderInputCell('sales_volume', 'total', 'liters')}</td>
+                    <td><ReadOnlyTotalCell value={salesVolumeTotal} unit="liters" /></td>
                   </tr>
                   {products.map(product => (
                     <tr key={product.product_code}>
@@ -522,7 +590,7 @@ try {
                 <tbody>
                   <tr className="table-light">
                     <td><strong>TOTAL</strong></td>
-                    <td>{renderInputCell('revenue', 'total', 'reais')}</td>
+                    <td><ReadOnlyTotalCell value={revenueTotal} unit="reais" /></td>
                   </tr>
                   {products.map(product => (
                     <tr key={product.product_code}>
