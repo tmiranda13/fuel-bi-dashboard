@@ -111,13 +111,10 @@ const AuthProvider = ({ children }) => {
       console.error('Profile fetch error:', profileError)
     }
     
-    // Store session locally (not relying on Supabase session)
+    // Store session locally for our own session management
+    // BUT keep Supabase signed in so RLS policies work for database queries
     const newSession = storeSession(data.user, profileData)
     setSession(newSession)
-    
-    // Sign out from Supabase to avoid their session management issues
-    // We're managing our own session now
-    await supabase.auth.signOut()
     
     return newSession
   }
