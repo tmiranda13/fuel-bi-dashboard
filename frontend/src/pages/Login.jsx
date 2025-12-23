@@ -1,13 +1,13 @@
 /**
  * Login Page
  * 
- * Handles user authentication using Supabase Auth
+ * Handles user authentication using custom session management
  */
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Container, Card, Form, Button, Alert, Spinner } from 'react-bootstrap'
-import { authService } from '../services/auth'
+import { useAuth } from '../App'
 
 const Login = () => {
   const [email, setEmail] = useState('')
@@ -15,6 +15,7 @@ const Login = () => {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const { login } = useAuth()
   
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -22,7 +23,7 @@ const Login = () => {
     setError(null)
     
     try {
-      await authService.login(email, password)
+      await login(email, password)
       navigate('/dashboard')
     } catch (err) {
       console.error('Login error:', err)
