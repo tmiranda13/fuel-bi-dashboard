@@ -127,7 +127,7 @@ export const purchasesService = {
     return data || []
   },
   
-async getPurchasesByProduct(startDate, endDate) {
+  async getPurchasesByProduct(startDate, endDate) {
     const purchases = await this.getPurchases(startDate, endDate)
     
     const byProduct = purchases.reduce((acc, p) => {
@@ -138,57 +138,19 @@ async getPurchasesByProduct(startDate, endDate) {
           product_name: p.product_name,
           volume: 0,
           total_cost: 0,
-          count: 0,
-          cost_prices: [],
-          suppliers: {}  // Track volume per supplier
+          count: 0
         }
       }
-      const quantity = parseFloat(p.quantity || 0)
-      acc[code].volume += quantity
+      acc[code].volume += parseFloat(p.quantity || 0)
       acc[code].total_cost += parseFloat(p.subtotal || 0)
       acc[code].count++
-      acc[code].cost_prices.push(parseFloat(p.cost_price || 0))
-      
-      // Track supplier volumes for this product
-      const supplier = p.supplier_name || 'Unknown'
-      if (!acc[code].suppliers[supplier]) {
-        acc[code].suppliers[supplier] = 0
-      }
-      acc[code].suppliers[supplier] += quantity
-      
       return acc
     }, {})
     
-    return Object.values(byProduct).map(p => {
-      // Calculate standard deviation for cost variation
-      let cost_std_dev = 0
-      if (p.cost_prices.length > 1) {
-        const mean = p.cost_prices.reduce((a, b) => a + b, 0) / p.cost_prices.length
-        const squareDiffs = p.cost_prices.map(price => Math.pow(price - mean, 2))
-        const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / (p.cost_prices.length - 1)
-        cost_std_dev = Math.sqrt(avgSquareDiff)
-      }
-      
-      // Find main supplier (highest volume)
-      let main_supplier = 'N/A'
-      let maxVolume = 0
-      Object.entries(p.suppliers).forEach(([supplier, volume]) => {
-        if (volume > maxVolume) {
-          maxVolume = volume
-          main_supplier = supplier
-        }
-      })
-      
-      return {
-        product_code: p.product_code,
-        product_name: p.product_name,
-        volume: p.volume,
-        total_cost: p.total_cost,
-        avg_cost: p.volume > 0 ? p.total_cost / p.volume : 0,
-        cost_std_dev: cost_std_dev,
-        main_supplier: main_supplier
-      }
-    })
+    return Object.values(byProduct).map(p => ({
+      ...p,
+      avg_cost: p.volume > 0 ? p.total_cost / p.volume : 0
+    }))
   },
   
   async getPurchasesBySupplier(startDate, endDate) {
@@ -336,15 +298,10 @@ export const kpisService = {
     return kpi ? parseFloat(kpi.target_value) : null
   },
   
-async createKpi(kpiData, companyId = null) {
-    // Use provided companyId or get from session
+async createKpi(kpiData, companyId) {
+    // companyId is required - must be passed from auth context
     if (!companyId) {
-      const { data: { session } } = await supabase.auth.getSession()
-      companyId = session?.user?.app_metadata?.company_id
-    }
-
-    if (!companyId) {
-      throw new Error('Company ID not found in session')
+      throw new Error('Company ID is required. Please login again.')
     }
 
     const { data, error } = await supabase
@@ -412,83 +369,5 @@ export const companyService = {
     }
     
     return data?.settings_data || {}
-  }
-}
-
-// ============================================================
-// INVENTORY VARIANCE SERVICE
-// ============================================================
-
-export const varianceService = {
-  async getVariance(startDate, endDate) {
-    let query = supabase
-      .from('daily_inventory_variance')
-      .select('*')
-      .order('variance_date', { ascending: true })
-    
-    if (startDate) query = query.gte('variance_date', startDate)
-    if (endDate) query = query.lte('variance_date', endDate)
-    
-    const { data, error } = await query
-    if (error) throw error
-    return data || []
-  },
-  
-  async getVarianceEvolution(startDate, endDate) {
-    const variance = await this.getVariance(startDate, endDate)
-    
-    const byDate = variance.reduce((acc, v) => {
-      const date = v.variance_date
-      if (!acc[date]) {
-        acc[date] = {
-          date,
-          GC: 0, GA: 0, ET: 0, DS10: 0, DS500: 0,
-          total: 0
-        }
-      }
-      
-      const code = v.product_code
-      const varianceValue = parseFloat(v.variance || 0)
-      
-      if (acc[date][code] !== undefined) {
-        acc[date][code] = varianceValue
-      }
-      acc[date].total += varianceValue
-      
-      return acc
-    }, {})
-    
-    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
-  },
-  
-  async getVarianceSummary(startDate, endDate) {
-    const variance = await this.getVariance(startDate, endDate)
-    
-    const byProduct = variance.reduce((acc, v) => {
-      const code = v.product_code
-      if (!acc[code]) {
-        acc[code] = {
-          product_code: code,
-          product_name: v.product_name,
-          total_gain: 0,
-          total_loss: 0,
-          net: 0,
-          count: 0
-        }
-      }
-      
-      const varianceValue = parseFloat(v.variance || 0)
-      if (varianceValue > 0) {
-        acc[code].total_gain += varianceValue
-      } else {
-        acc[code].total_loss += varianceValue
-      }
-      acc[code].net += varianceValue
-      acc[code].count++
-      
-      return acc
-    }, {})
-    
-    return Object.values(byProduct)
   }
 }
