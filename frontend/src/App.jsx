@@ -11,6 +11,10 @@ import './assets/index.css'
 
 const AuthContext = createContext(null)
 
+// Session storage key
+const SESSION_KEY = 'fuel_bi_session'
+const SESSION_DURATION = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
@@ -19,123 +23,120 @@ export const useAuth = () => {
   return context
 }
 
-const AuthProvider = ({ children }) => {
-  const [session, setSession] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  
-  // Fetch profile directly using user id
-  const fetchProfile = async (userId) => {
-    if (!userId) return null
+// Helper to get stored session
+const getStoredSession = () => {
+  try {
+    const stored = localStorage.getItem(SESSION_KEY)
+    if (!stored) return null
     
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select(`
-          id,
-          email,
-          full_name,
-          role,
-          company_id,
-          is_active,
-          companies (
-            id,
-            company_code,
-            company_name,
-            display_name,
-            status
-          )
-        `)
-        .eq('auth_id', userId)
-        .single()
-      
-      if (error) {
-        console.error('Profile fetch error:', error)
-        return null
-      }
-      return data
-    } catch (e) {
-      console.error('Profile fetch exception:', e)
+    const session = JSON.parse(stored)
+    
+    // Check if session is expired
+    if (Date.now() > session.expiresAt) {
+      localStorage.removeItem(SESSION_KEY)
       return null
     }
+    
+    return session
+  } catch (e) {
+    localStorage.removeItem(SESSION_KEY)
+    return null
   }
-  
-  // Simple logout - clears everything
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut()
-    } catch (e) {
-      console.error('Logout error:', e)
-    }
-    setSession(null)
-    setProfile(null)
+}
+
+// Helper to store session
+const storeSession = (user, profile) => {
+  const session = {
+    user,
+    profile,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + SESSION_DURATION
   }
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  return session
+}
+
+// Helper to clear session
+const clearStoredSession = () => {
+  localStorage.removeItem(SESSION_KEY)
+}
+
+const AuthProvider = ({ children }) => {
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
   
+  // Initialize from stored session
   useEffect(() => {
-    let isMounted = true
-    
-    const initAuth = async () => {
-      try {
-        // Simple session check - no complex validation
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!isMounted) return
-        
-        if (session?.user) {
-          // Check if token is expired (with 5 min buffer)
-          const expiresAt = session.expires_at
-          const now = Math.floor(Date.now() / 1000)
-          const buffer = 300 // 5 minutes
-          
-          if (expiresAt && now >= (expiresAt - buffer)) {
-            console.log('Session expired, redirecting to login')
-            await logout()
-            setLoading(false)
-            return
-          }
-          
-          setSession(session)
-          const profile = await fetchProfile(session.user.id)
-          if (isMounted) setProfile(profile)
-        }
-        
-        if (isMounted) setLoading(false)
-      } catch (e) {
-        console.error('Auth init error:', e)
-        if (isMounted) {
-          await logout()
-          setLoading(false)
-        }
-      }
+    const stored = getStoredSession()
+    if (stored) {
+      setSession(stored)
     }
-    
-    initAuth()
-    
-    // Listen for sign in/out only (not token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        if (!isMounted) return
-        
-        console.log('Auth event:', event)
-        
-        if (event === 'SIGNED_IN' && newSession?.user) {
-          setSession(newSession)
-          const profile = await fetchProfile(newSession.user.id)
-          if (isMounted) setProfile(profile)
-        }
-        
-        if (event === 'SIGNED_OUT') {
-          setSession(null)
-          setProfile(null)
-        }
-      }
-    )
-    
-    return () => {
-      isMounted = false
-      subscription?.unsubscribe()
-    }
+    setLoading(false)
   }, [])
+  
+  // Login function - called from Login page
+  const login = async (email, password) => {
+    // Authenticate with Supabase
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+    
+    if (error) {
+      throw new Error(error.message || 'Login failed')
+    }
+    
+    // Fetch profile
+    const { data: profileData, error: profileError } = await supabase
+      .from('users')
+      .select(`
+        id,
+        email,
+        full_name,
+        role,
+        company_id,
+        is_active,
+        companies (
+          id,
+          company_code,
+          company_name,
+          display_name,
+          status
+        )
+      `)
+      .eq('auth_id', data.user.id)
+      .single()
+    
+    if (profileError) {
+      console.error('Profile fetch error:', profileError)
+    }
+    
+    // Store session locally (not relying on Supabase session)
+    const newSession = storeSession(data.user, profileData)
+    setSession(newSession)
+    
+    // Sign out from Supabase to avoid their session management issues
+    // We're managing our own session now
+    await supabase.auth.signOut()
+    
+    return newSession
+  }
+  
+  // Logout function
+  const logout = () => {
+    clearStoredSession()
+    setSession(null)
+  }
+  
+  // Refresh session (extend expiry) - call this on user activity if needed
+  const refreshSession = () => {
+    if (session) {
+      const refreshed = storeSession(session.user, session.profile)
+      setSession(refreshed)
+    }
+  }
+  
+  const profile = session?.profile
   
   const value = {
     session,
@@ -143,7 +144,9 @@ const AuthProvider = ({ children }) => {
     user: session?.user,
     isAuthenticated: !!session,
     isLoading: loading,
+    login,
     logout,
+    refreshSession,
     companyId: profile?.company_id,
     companyName: profile?.companies?.display_name || profile?.companies?.company_name,
     userRole: profile?.role,
