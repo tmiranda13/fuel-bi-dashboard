@@ -7,11 +7,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables!')
 }
 
+// Minimal Supabase client - we manage our own sessions
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: false,  // Disabled - we handle expiry by redirecting to login
-    persistSession: true,
-    detectSessionInUrl: true
+    autoRefreshToken: false,
+    persistSession: false,  // Don't persist - we handle this ourselves
+    detectSessionInUrl: false
   }
 })
 
