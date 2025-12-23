@@ -381,10 +381,10 @@ export const varianceService = {
     let query = supabase
       .from('daily_inventory_variance')
       .select('*')
-      .order('measurement_date', { ascending: true })
+      .order('variance_date', { ascending: true })
     
-    if (startDate) query = query.gte('measurement_date', startDate)
-    if (endDate) query = query.lte('measurement_date', endDate)
+    if (startDate) query = query.gte('variance_date', startDate)
+    if (endDate) query = query.lte('variance_date', endDate)
     
     const { data, error } = await query
     if (error) throw error
@@ -396,7 +396,7 @@ export const varianceService = {
     
     // Group by date, showing variance per product
     const byDate = variance.reduce((acc, v) => {
-      const date = v.measurement_date
+      const date = v.variance_date
       if (!date) return acc
       
       if (!acc[date]) {
@@ -408,7 +408,7 @@ export const varianceService = {
       }
       
       const code = v.product_code
-      const varianceValue = parseFloat(v.variance_liters || 0)
+      const varianceValue = parseFloat(v.variance || 0)
       
       if (code && acc[date][code] !== undefined) {
         acc[date][code] = varianceValue
@@ -440,7 +440,7 @@ export const varianceService = {
         }
       }
       
-      const varianceValue = parseFloat(v.variance_liters || 0)
+      const varianceValue = parseFloat(v.variance || 0)
       
       if (varianceValue > 0) {
         acc[code].total_gain += varianceValue
