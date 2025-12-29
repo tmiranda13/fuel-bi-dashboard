@@ -139,7 +139,7 @@ const Vendas = () => {
     const kpi = kpis.find(k =>
       k.kpi_type === kpiType &&
       (productCode ? k.product_code === productCode : !k.product_code) &&
-      k.start_date === monthStart
+      k.start_date?.substring(0, 10) === monthStart
     )
     return kpi ? parseFloat(kpi.target_value) : 0
   }
@@ -149,12 +149,12 @@ const Vendas = () => {
     // For percentages, get the most recent month's target
     const months = getMonthsInRange()
     if (months.length === 0) return null
-    
+
     const lastMonth = months[months.length - 1]
     const kpi = kpis.find(k =>
       k.kpi_type === kpiType &&
       (productCode ? k.product_code === productCode : !k.product_code) &&
-      k.start_date === lastMonth.monthStart
+      k.start_date?.substring(0, 10) === lastMonth.monthStart
     )
     return kpi ? parseFloat(kpi.target_value) : null
   }
