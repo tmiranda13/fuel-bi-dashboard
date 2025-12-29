@@ -102,7 +102,6 @@ const Vendas = () => {
     // Parse dates without timezone issues by splitting the string
     const [startYear, startMonth, startDay] = appliedStartDate.split('-').map(Number)
     const [endYear, endMonth, endDay] = appliedEndDate.split('-').map(Number)
-    console.log('[DEBUG v2] Parsed dates:', { startYear, startMonth, startDay, endYear, endMonth, endDay })
 
     const months = []
 
@@ -143,7 +142,6 @@ const Vendas = () => {
       }
     }
 
-    console.log('[DEBUG v2] Months in range:', months)
     return months
   }, [appliedStartDate, appliedEndDate])
 
