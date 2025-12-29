@@ -99,59 +99,59 @@ const Vendas = () => {
 
   // Get all months in the selected date range with their day counts
   const getMonthsInRange = useCallback(() => {
-    const start = new Date(appliedStartDate)
-    const end = new Date(appliedEndDate)
+    // Parse dates without timezone issues by splitting the string
+    const [startYear, startMonth, startDay] = appliedStartDate.split('-').map(Number)
+    const [endYear, endMonth, endDay] = appliedEndDate.split('-').map(Number)
+
     const months = []
-    
-    let current = new Date(start.getFullYear(), start.getMonth(), 1)
-    
-    while (current <= end) {
-      const year = current.getFullYear()
-      const month = current.getMonth()
-      const daysInMonth = new Date(year, month + 1, 0).getDate()
-      const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`
-      
+
+    let currentYear = startYear
+    let currentMonth = startMonth // 1-indexed from string
+
+    while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
+      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate() // currentMonth is 1-indexed, so this gives correct days
+      const monthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`
+
       // Calculate days selected in this month
-      const rangeStart = new Date(Math.max(start.getTime(), current.getTime()))
-      const monthEnd = new Date(year, month + 1, 0)
-      const rangeEnd = new Date(Math.min(end.getTime(), monthEnd.getTime()))
-      
-      const daysSelected = Math.ceil((rangeEnd - rangeStart) / (1000 * 60 * 60 * 24)) + 1
-      
+      let firstDayInRange = 1
+      let lastDayInRange = daysInMonth
+
+      if (currentYear === startYear && currentMonth === startMonth) {
+        firstDayInRange = startDay
+      }
+      if (currentYear === endYear && currentMonth === endMonth) {
+        lastDayInRange = endDay
+      }
+
+      const daysSelected = lastDayInRange - firstDayInRange + 1
+
       months.push({
-        year,
-        month,
+        year: currentYear,
+        month: currentMonth - 1, // Convert to 0-indexed for consistency
         monthStart,
         daysInMonth,
         daysSelected,
         factor: daysSelected / daysInMonth
       })
-      
+
       // Move to next month
-      current = new Date(year, month + 1, 1)
+      currentMonth++
+      if (currentMonth > 12) {
+        currentMonth = 1
+        currentYear++
+      }
     }
-    
+
     return months
   }, [appliedStartDate, appliedEndDate])
 
   // Helper to get KPI target by type, product code, and month
   const getKpiTargetForMonth = (kpiType, productCode, monthStart) => {
-    console.log('[DEBUG] getKpiTargetForMonth called:', { kpiType, productCode, monthStart })
-    console.log('[DEBUG] All KPIs:', kpis)
-    const kpi = kpis.find(k => {
-      const dateMatch = k.start_date?.substring(0, 10) === monthStart
-      console.log('[DEBUG] Checking KPI:', {
-        kpi_type: k.kpi_type,
-        product_code: k.product_code,
-        start_date: k.start_date,
-        target_value: k.target_value,
-        dateMatch
-      })
-      return k.kpi_type === kpiType &&
-        (productCode ? k.product_code === productCode : !k.product_code) &&
-        dateMatch
-    })
-    console.log('[DEBUG] Found KPI:', kpi)
+    const kpi = kpis.find(k =>
+      k.kpi_type === kpiType &&
+      (productCode ? k.product_code === productCode : !k.product_code) &&
+      k.start_date?.substring(0, 10) === monthStart
+    )
     return kpi ? parseFloat(kpi.target_value) : 0
   }
 
@@ -173,16 +173,13 @@ const Vendas = () => {
   // Get prorated KPI target summed across all months in range
   const getProratedKpiTarget = (kpiType, productCode = null) => {
     const months = getMonthsInRange()
-    console.log('[DEBUG] getProratedKpiTarget:', { kpiType, productCode, months })
     let total = 0
 
     for (const m of months) {
       const monthlyTarget = getKpiTargetForMonth(kpiType, productCode, m.monthStart)
-      console.log('[DEBUG] Month calculation:', { month: m.monthStart, factor: m.factor, monthlyTarget, contribution: monthlyTarget * m.factor })
       total += monthlyTarget * m.factor
     }
 
-    console.log('[DEBUG] Total prorated target:', total)
     return total > 0 ? total : null
   }
 
