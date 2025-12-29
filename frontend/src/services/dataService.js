@@ -129,7 +129,10 @@ export const purchasesService = {
   
   async getPurchasesByProduct(startDate, endDate) {
     const purchases = await this.getPurchases(startDate, endDate)
-    
+
+    // Track suppliers per product for main supplier calculation
+    const productSuppliers = {}
+
     const byProduct = purchases.reduce((acc, p) => {
       const code = p.canonical_product_code || p.product_code
       if (!acc[code]) {
@@ -138,19 +141,58 @@ export const purchasesService = {
           product_name: p.product_name,
           volume: 0,
           total_cost: 0,
-          count: 0
+          count: 0,
+          cost_prices: [] // Track individual prices for std dev calculation
         }
       }
-      acc[code].volume += parseFloat(p.quantity || 0)
+      const quantity = parseFloat(p.quantity || 0)
+      const costPrice = parseFloat(p.cost_price || 0)
+
+      acc[code].volume += quantity
       acc[code].total_cost += parseFloat(p.subtotal || 0)
       acc[code].count++
+      if (costPrice > 0) {
+        acc[code].cost_prices.push(costPrice)
+      }
+
+      // Track suppliers per product
+      const supplier = p.supplier_name || 'Unknown'
+      if (!productSuppliers[code]) productSuppliers[code] = {}
+      if (!productSuppliers[code][supplier]) productSuppliers[code][supplier] = 0
+      productSuppliers[code][supplier] += quantity
+
       return acc
     }, {})
-    
-    return Object.values(byProduct).map(p => ({
-      ...p,
-      avg_cost: p.volume > 0 ? p.total_cost / p.volume : 0
-    }))
+
+    // Helper function to calculate standard deviation
+    const calcStdDev = (values) => {
+      if (values.length < 2) return 0
+      const mean = values.reduce((a, b) => a + b, 0) / values.length
+      const squaredDiffs = values.map(v => Math.pow(v - mean, 2))
+      const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / (values.length - 1)
+      return Math.sqrt(avgSquaredDiff)
+    }
+
+    return Object.values(byProduct).map(p => {
+      // Find main supplier for this product (highest volume)
+      let mainSupplier = 'N/A'
+      if (productSuppliers[p.product_code]) {
+        const suppliers = Object.entries(productSuppliers[p.product_code])
+        if (suppliers.length > 0) {
+          mainSupplier = suppliers.reduce((a, b) => a[1] > b[1] ? a : b)[0]
+        }
+      }
+
+      return {
+        product_code: p.product_code,
+        product_name: p.product_name,
+        volume: p.volume,
+        total_cost: p.total_cost,
+        avg_cost: p.volume > 0 ? p.total_cost / p.volume : 0,
+        cost_std_dev: calcStdDev(p.cost_prices),
+        main_supplier: mainSupplier
+      }
+    })
   },
   
   async getPurchasesBySupplier(startDate, endDate) {
