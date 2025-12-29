@@ -136,11 +136,22 @@ const Vendas = () => {
 
   // Helper to get KPI target by type, product code, and month
   const getKpiTargetForMonth = (kpiType, productCode, monthStart) => {
-    const kpi = kpis.find(k =>
-      k.kpi_type === kpiType &&
-      (productCode ? k.product_code === productCode : !k.product_code) &&
-      k.start_date?.substring(0, 10) === monthStart
-    )
+    console.log('[DEBUG] getKpiTargetForMonth called:', { kpiType, productCode, monthStart })
+    console.log('[DEBUG] All KPIs:', kpis)
+    const kpi = kpis.find(k => {
+      const dateMatch = k.start_date?.substring(0, 10) === monthStart
+      console.log('[DEBUG] Checking KPI:', {
+        kpi_type: k.kpi_type,
+        product_code: k.product_code,
+        start_date: k.start_date,
+        target_value: k.target_value,
+        dateMatch
+      })
+      return k.kpi_type === kpiType &&
+        (productCode ? k.product_code === productCode : !k.product_code) &&
+        dateMatch
+    })
+    console.log('[DEBUG] Found KPI:', kpi)
     return kpi ? parseFloat(kpi.target_value) : 0
   }
 
@@ -162,13 +173,16 @@ const Vendas = () => {
   // Get prorated KPI target summed across all months in range
   const getProratedKpiTarget = (kpiType, productCode = null) => {
     const months = getMonthsInRange()
+    console.log('[DEBUG] getProratedKpiTarget:', { kpiType, productCode, months })
     let total = 0
-    
+
     for (const m of months) {
       const monthlyTarget = getKpiTargetForMonth(kpiType, productCode, m.monthStart)
+      console.log('[DEBUG] Month calculation:', { month: m.monthStart, factor: m.factor, monthlyTarget, contribution: monthlyTarget * m.factor })
       total += monthlyTarget * m.factor
     }
-    
+
+    console.log('[DEBUG] Total prorated target:', total)
     return total > 0 ? total : null
   }
 
