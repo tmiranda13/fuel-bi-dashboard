@@ -186,15 +186,43 @@ export const purchasesService = {
   async getPurchasesByProduct(startDate, endDate) {
     const purchases = await this.getPurchases(startDate, endDate)
 
+    // Map product names to canonical codes for proper grouping
+    const nameToCode = {
+      'GASOLINA COMUM': 'GC',
+      'GASOLINA COMUM.': 'GC',
+      'GASOLINA ADITIVADA': 'GA',
+      'GASOLINA ADITIVADA.': 'GA',
+      'ETANOL': 'ET',
+      'ETANOL.': 'ET',
+      'DIESEL S10': 'DS10',
+      'DIESEL S10.': 'DS10',
+      'DIESEL S-10': 'DS10',
+      'DIESEL S500': 'DS500',
+      'DIESEL S500.': 'DS500',
+      'DIESEL S-500': 'DS500',
+      'DIESEL COMUM': 'DS500'
+    }
+
+    const codeToName = {
+      'GC': 'GASOLINA COMUM',
+      'GA': 'GASOLINA ADITIVADA',
+      'ET': 'ETANOL',
+      'DS10': 'DIESEL S10',
+      'DS500': 'DIESEL S500'
+    }
+
     // Track suppliers per product for main supplier calculation
     const productSuppliers = {}
 
     const byProduct = purchases.reduce((acc, p) => {
-      const code = p.canonical_product_code || p.product_code
+      // Normalize product name to canonical code
+      const productName = (p.product_name || p.source_product_name || '').toUpperCase().trim()
+      const code = nameToCode[productName] || p.canonical_product_code || p.product_code
+
       if (!acc[code]) {
         acc[code] = {
           product_code: code,
-          product_name: p.product_name,
+          product_name: codeToName[code] || productName,
           volume: 0,
           total_cost: 0,
           count: 0,
@@ -279,13 +307,30 @@ export const purchasesService = {
   
   async getPurchasesEvolution(startDate, endDate) {
     const purchases = await this.getPurchases(startDate, endDate)
-    
+
+    // Map product names to canonical codes
+    const nameToCode = {
+      'GASOLINA COMUM': 'GC',
+      'GASOLINA COMUM.': 'GC',
+      'GASOLINA ADITIVADA': 'GA',
+      'GASOLINA ADITIVADA.': 'GA',
+      'ETANOL': 'ET',
+      'ETANOL.': 'ET',
+      'DIESEL S10': 'DS10',
+      'DIESEL S10.': 'DS10',
+      'DIESEL S-10': 'DS10',
+      'DIESEL S500': 'DS500',
+      'DIESEL S500.': 'DS500',
+      'DIESEL S-500': 'DS500',
+      'DIESEL COMUM': 'DS500'
+    }
+
     const byDate = {}
-    
+
     purchases.forEach(p => {
       const date = p.receipt_date
       if (!date) return
-      
+
       if (!byDate[date]) {
         byDate[date] = {
           date,
@@ -294,23 +339,25 @@ export const purchasesService = {
           totalVolume: 0
         }
       }
-      
-      const code = p.canonical_product_code || p.product_code
+
+      // Normalize product name to canonical code
+      const productName = (p.product_name || p.source_product_name || '').toUpperCase().trim()
+      const code = nameToCode[productName]
       const cost = parseFloat(p.cost_price || 0)
       const volume = parseFloat(p.quantity || 0)
-      
-      if (code && cost > 0) {
+
+      if (code && cost > 0 && byDate[date][code] !== undefined) {
         byDate[date][code] = cost
       }
-      
+
       byDate[date].totalCost += parseFloat(p.subtotal || 0)
       byDate[date].totalVolume += volume
     })
-    
+
     Object.values(byDate).forEach(day => {
       day.avg_cost = day.totalVolume > 0 ? day.totalCost / day.totalVolume : 0
     })
-    
+
     return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
   }
 }
