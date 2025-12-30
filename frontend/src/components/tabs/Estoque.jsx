@@ -5,10 +5,16 @@ import { fetchEstoqueDashboard, fetchEstoqueEvolution, fetchVarianceData, sortPr
 
 const Estoque = () => {
   const [startDate, setStartDate] = useState(() => {
-    return localStorage.getItem('estoque_startDate') || '2025-09-01'
+    const stored = localStorage.getItem('estoque_startDate')
+    if (stored) return stored
+    const date = new Date()
+    date.setDate(date.getDate() - 30)
+    return date.toISOString().split('T')[0]
   })
   const [endDate, setEndDate] = useState(() => {
-    return localStorage.getItem('estoque_endDate') || '2025-12-03'
+    const stored = localStorage.getItem('estoque_endDate')
+    if (stored) return stored
+    return new Date().toISOString().split('T')[0]
   })
 
   const [loading, setLoading] = useState(true)

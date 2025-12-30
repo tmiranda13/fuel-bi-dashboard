@@ -6,10 +6,16 @@ import MockDataBadge, { MockDataCard } from '../MockDataBadge'
 
 const Vendas = () => {
   const [startDate, setStartDate] = useState(() => {
-    return localStorage.getItem('vendas_startDate') || '2025-09-01'
+    const stored = localStorage.getItem('vendas_startDate')
+    if (stored) return stored
+    const date = new Date()
+    date.setDate(date.getDate() - 30)
+    return date.toISOString().split('T')[0]
   })
   const [endDate, setEndDate] = useState(() => {
-    return localStorage.getItem('vendas_endDate') || '2025-12-03'
+    const stored = localStorage.getItem('vendas_endDate')
+    if (stored) return stored
+    return new Date().toISOString().split('T')[0]
   })
   const [customerFilter, setCustomerFilter] = useState('')
 
