@@ -13,17 +13,35 @@ import { supabase } from './supabase'
 
 export const salesService = {
   async getSales(startDate, endDate) {
-    let query = supabase
-      .from('pump_sales_intraday')
-      .select('*')
-      .order('sale_date', { ascending: true })
-    
-    if (startDate) query = query.gte('sale_date', startDate)
-    if (endDate) query = query.lte('sale_date', endDate)
-    
-    const { data, error } = await query
-    if (error) throw error
-    return data || []
+    // Fetch all records (Supabase defaults to 1000 rows, we need more)
+    const allData = []
+    let from = 0
+    const pageSize = 1000
+
+    while (true) {
+      let query = supabase
+        .from('pump_sales_intraday')
+        .select('*')
+        .order('sale_date', { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      if (startDate) query = query.gte('sale_date', startDate)
+      if (endDate) query = query.lte('sale_date', endDate)
+
+      const { data, error } = await query
+      if (error) throw error
+
+      if (!data || data.length === 0) break
+
+      allData.push(...data)
+
+      // If we got less than pageSize, we've reached the end
+      if (data.length < pageSize) break
+
+      from += pageSize
+    }
+
+    return allData
   },
   
   async getSalesByProduct(startDate, endDate) {
@@ -92,17 +110,34 @@ export const salesService = {
 
 export const purchasesService = {
   async getPurchases(startDate, endDate) {
-    let query = supabase
-      .from('purchases')
-      .select('*')
-      .order('receipt_date', { ascending: true })
-    
-    if (startDate) query = query.gte('receipt_date', startDate)
-    if (endDate) query = query.lte('receipt_date', endDate)
-    
-    const { data, error } = await query
-    if (error) throw error
-    return data || []
+    // Fetch all records with pagination (Supabase defaults to 1000 rows)
+    const allData = []
+    let from = 0
+    const pageSize = 1000
+
+    while (true) {
+      let query = supabase
+        .from('purchases')
+        .select('*')
+        .order('receipt_date', { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      if (startDate) query = query.gte('receipt_date', startDate)
+      if (endDate) query = query.lte('receipt_date', endDate)
+
+      const { data, error } = await query
+      if (error) throw error
+
+      if (!data || data.length === 0) break
+
+      allData.push(...data)
+
+      if (data.length < pageSize) break
+
+      from += pageSize
+    }
+
+    return allData
   },
   
   async getFIFOBatches() {
