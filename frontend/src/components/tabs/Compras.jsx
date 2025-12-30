@@ -195,6 +195,13 @@ const Compras = () => {
         dayOfWeek = daysOfWeek[date.getDay()]
       }
 
+      // Filter out scatter plot entries (Compra) and only show main price lines
+      const filteredPayload = payload.filter(entry =>
+        entry.value != null &&
+        !entry.name?.startsWith('Compra') &&
+        !entry.dataKey?.includes('Purchase')
+      )
+
       return (
         <div style={{
           backgroundColor: 'white',
@@ -205,7 +212,7 @@ const Compras = () => {
           <p style={{ margin: 0, fontWeight: 'bold', marginBottom: '8px' }}>
             {dayOfWeek && `${dayOfWeek}, `}{label}
           </p>
-          {payload.filter(entry => entry.value != null).map((entry, index) => (
+          {filteredPayload.map((entry, index) => (
             <p key={index} style={{ margin: '4px 0', color: entry.color }}>
               {entry.name}: R$ {entry.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/L
             </p>
