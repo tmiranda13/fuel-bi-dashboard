@@ -195,11 +195,11 @@ const Compras = () => {
         dayOfWeek = daysOfWeek[date.getDay()]
       }
 
-      // Filter out scatter plot entries (Compra) and only show main price lines
+      // Filter out scatter plot entries (Compra), dia labels, and only show main price lines
+      const allowedDataKeys = ['gasolinaComum', 'gasolinaAditivada', 'etanol', 'dieselS10', 'dieselS500', 'custoMedioGeral']
       const filteredPayload = payload.filter(entry =>
         entry.value != null &&
-        !entry.name?.startsWith('Compra') &&
-        !entry.dataKey?.includes('Purchase')
+        allowedDataKeys.includes(entry.dataKey)
       )
 
       return (
