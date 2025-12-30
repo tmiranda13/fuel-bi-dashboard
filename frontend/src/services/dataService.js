@@ -43,12 +43,6 @@ export const salesService = {
       from += pageSize
     }
 
-    console.log(`[DEBUG] getSales: fetched ${allData.length} records from ${startDate} to ${endDate}`)
-    if (allData.length > 0) {
-      const dates = [...new Set(allData.map(s => s.sale_date))].sort()
-      console.log(`[DEBUG] getSales: date range in data: ${dates[0]} to ${dates[dates.length - 1]}`)
-    }
-
     return allData
   },
   
@@ -127,10 +121,7 @@ export const salesService = {
       return acc
     }, {})
 
-    const result = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
-    console.log(`[DEBUG] getDailyEvolution: ${result.length} days, last date: ${result.length > 0 ? result[result.length - 1].date : 'none'}`)
-
-    return result
+    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
   }
 }
 
