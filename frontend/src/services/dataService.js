@@ -13,20 +13,22 @@ import { supabase } from './supabase'
 
 export const salesService = {
   async getSales(startDate, endDate) {
-    // Fetch all records (Supabase defaults to 1000 rows, we need more)
+    // Fetch all records with pagination (Supabase defaults to 1000 rows)
     const allData = []
     let from = 0
     const pageSize = 1000
 
     while (true) {
+      // Build query with filters BEFORE range
       let query = supabase
         .from('pump_sales_intraday')
         .select('*')
-        .order('sale_date', { ascending: true })
-        .range(from, from + pageSize - 1)
 
       if (startDate) query = query.gte('sale_date', startDate)
       if (endDate) query = query.lte('sale_date', endDate)
+
+      // Apply order and range AFTER filters
+      query = query.order('sale_date', { ascending: true }).range(from, from + pageSize - 1)
 
       const { data, error } = await query
       if (error) throw error
@@ -39,6 +41,12 @@ export const salesService = {
       if (data.length < pageSize) break
 
       from += pageSize
+    }
+
+    console.log(`[DEBUG] getSales: fetched ${allData.length} records from ${startDate} to ${endDate}`)
+    if (allData.length > 0) {
+      const dates = [...new Set(allData.map(s => s.sale_date))].sort()
+      console.log(`[DEBUG] getSales: date range in data: ${dates[0]} to ${dates[dates.length - 1]}`)
     }
 
     return allData
@@ -72,35 +80,57 @@ export const salesService = {
   
   async getDailyEvolution(startDate, endDate) {
     const sales = await this.getSales(startDate, endDate)
-    
+
+    // Map product names to canonical codes
+    const nameToCode = {
+      'GASOLINA COMUM': 'GC',
+      'GASOLINA COMUM.': 'GC',
+      'GASOLINA ADITIVADA': 'GA',
+      'GASOLINA ADITIVADA.': 'GA',
+      'ETANOL': 'ET',
+      'ETANOL.': 'ET',
+      'DIESEL S10': 'DS10',
+      'DIESEL S10.': 'DS10',
+      'DIESEL S-10': 'DS10',
+      'DIESEL S500': 'DS500',
+      'DIESEL S500.': 'DS500',
+      'DIESEL S-500': 'DS500',
+      'DIESEL COMUM': 'DS500'
+    }
+
     const byDate = sales.reduce((acc, sale) => {
       const date = sale.sale_date
       if (!date) return acc
-      
+
       if (!acc[date]) {
-        acc[date] = { 
-          date, 
-          volume: 0, 
+        acc[date] = {
+          date,
+          volume: 0,
           revenue: 0,
           total: 0,
           GC: 0, GA: 0, ET: 0, DS10: 0, DS500: 0
         }
       }
-      
+
       const volume = parseFloat(sale.volume_sold || 0)
       acc[date].volume += volume
       acc[date].total += volume
       acc[date].revenue += parseFloat(sale.total_revenue || 0)
-      
-      const code = sale.product_code
-      if (acc[date][code] !== undefined) {
-        acc[date][code] += volume
+
+      // Map product name to canonical code
+      const productName = (sale.product_name || '').toUpperCase().trim()
+      const canonicalCode = nameToCode[productName]
+      if (canonicalCode && acc[date][canonicalCode] !== undefined) {
+        acc[date][canonicalCode] += volume
       }
-      
+
       return acc
     }, {})
-    
-    return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
+
+    const result = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
+    console.log(`[DEBUG] getDailyEvolution: ${result.length} days, last date: ${result.length > 0 ? result[result.length - 1].date : 'none'}`)
+
+    return result
   }
 }
 
