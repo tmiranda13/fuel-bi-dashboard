@@ -1,11 +1,14 @@
 /**
  * Data Service
- * 
+ *
  * Direct Supabase queries for all data operations.
  * Replaces Flask API endpoints.
  */
 
 import { supabase } from './supabase'
+
+// Company ID for Posto PCL
+const COMPANY_ID = 2
 
 // ============================================================
 // SALES SERVICE
@@ -23,6 +26,7 @@ export const salesService = {
       let query = supabase
         .from('pump_sales_intraday')
         .select('*')
+        .eq('company_id', COMPANY_ID)
 
       if (startDate) query = query.gte('sale_date', startDate)
       if (endDate) query = query.lte('sale_date', endDate)
@@ -137,14 +141,17 @@ export const purchasesService = {
     const pageSize = 1000
 
     while (true) {
+      // Build query with filters BEFORE range
       let query = supabase
         .from('purchases')
         .select('*')
-        .order('receipt_date', { ascending: true })
-        .range(from, from + pageSize - 1)
+        .eq('company_id', COMPANY_ID)
 
       if (startDate) query = query.gte('receipt_date', startDate)
       if (endDate) query = query.lte('receipt_date', endDate)
+
+      // Apply order and range AFTER filters
+      query = query.order('receipt_date', { ascending: true }).range(from, from + pageSize - 1)
 
       const { data, error } = await query
       if (error) throw error
