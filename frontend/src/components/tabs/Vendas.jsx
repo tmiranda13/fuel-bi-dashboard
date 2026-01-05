@@ -1000,16 +1000,32 @@ const Vendas = () => {
                   </thead>
                   <tbody>
                     {filteredClientes.length > 0 ? (
-                      filteredClientes.slice(0, 20).map((cliente, index) => (
-                        <tr key={cliente.client_code || index}>
-                          <td><strong>{cliente.client_name}</strong></td>
-                          <td>{cliente.cnpj || <span className="text-muted">-</span>}</td>
-                          <td>{Math.round(cliente.total_volume).toLocaleString('pt-BR')} L</td>
-                          <td>{Math.round(cliente.current_month_volume).toLocaleString('pt-BR')} L</td>
-                          <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cliente.total_revenue)}</td>
-                          <td><Badge bg="info">{cliente.main_product}</Badge></td>
-                        </tr>
-                      ))
+                      filteredClientes.slice(0, 10).map((cliente, index) => {
+                        // Product color mapping (same as charts)
+                        const productColorMap = {
+                          'Gasolina Comum': { bg: '#0088FE', text: 'white' },
+                          'Gasolina Aditivada': { bg: '#00C49F', text: 'white' },
+                          'Etanol': { bg: '#FFBB28', text: 'dark' },
+                          'Diesel S10': { bg: '#FF8042', text: 'white' },
+                          'Diesel S500': { bg: '#8884D8', text: 'white' }
+                        }
+                        const productStyle = productColorMap[cliente.main_product] || { bg: '#6c757d', text: 'white' }
+
+                        return (
+                          <tr key={cliente.client_code || index}>
+                            <td><strong>{cliente.client_name}</strong></td>
+                            <td>{cliente.cnpj || <span className="text-muted">-</span>}</td>
+                            <td>{Math.round(cliente.total_volume).toLocaleString('pt-BR')} L</td>
+                            <td>{Math.round(cliente.current_month_volume).toLocaleString('pt-BR')} L</td>
+                            <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cliente.total_revenue)}</td>
+                            <td>
+                              <Badge style={{ backgroundColor: productStyle.bg, color: productStyle.text }}>
+                                {cliente.main_product}
+                              </Badge>
+                            </td>
+                          </tr>
+                        )
+                      })
                     ) : (
                       <tr>
                         <td colSpan="6" className="text-center text-muted py-4">
@@ -1020,9 +1036,9 @@ const Vendas = () => {
                   </tbody>
                 </Table>
               )}
-              {filteredClientes.length > 20 && (
+              {filteredClientes.length > 10 && (
                 <div className="text-center text-muted small">
-                  Mostrando os 20 maiores clientes por volume. Total: {filteredClientes.length} clientes.
+                  Mostrando os 10 maiores clientes por volume. Total: {filteredClientes.length} clientes.
                 </div>
               )}
             </Card.Body>

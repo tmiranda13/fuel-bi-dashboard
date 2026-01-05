@@ -681,6 +681,11 @@ export const pjClientsService = {
         }
       }
 
+      // Update CNPJ if current transaction has one and existing doesn't
+      if (t.cnpj && !acc[key].cnpj) {
+        acc[key].cnpj = t.cnpj
+      }
+
       const volume = parseFloat(t.volume || 0)
       const value = parseFloat(t.total_value || 0)
 
