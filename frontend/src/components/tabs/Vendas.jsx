@@ -964,19 +964,41 @@ const Vendas = () => {
               )}
 
               {/* Search Filter */}
-              <Row className="mb-3">
+              <Row className="mb-3 align-items-center">
                 <Col md={6}>
-                  <Form.Control
-                    type="text"
-                    placeholder="Buscar por Razão Social ou CNPJ..."
-                    value={customerFilter}
-                    onChange={(e) => setCustomerFilter(e.target.value)}
-                  />
+                  <div className="position-relative">
+                    <span
+                      className="position-absolute"
+                      style={{
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#6c757d',
+                        fontSize: '1.1rem'
+                      }}
+                    >
+                      🔍
+                    </span>
+                    <Form.Control
+                      type="text"
+                      placeholder="Buscar cliente por Razão Social ou CNPJ..."
+                      value={customerFilter}
+                      onChange={(e) => setCustomerFilter(e.target.value)}
+                      style={{
+                        paddingLeft: '40px',
+                        backgroundColor: '#f8f9fa',
+                        border: '2px solid #dee2e6',
+                        borderRadius: '8px',
+                        fontSize: '0.95rem'
+                      }}
+                      className="shadow-sm"
+                    />
+                  </div>
                 </Col>
                 <Col md={6} className="text-end">
-                  <small className="text-muted">
+                  <Badge bg="secondary" className="py-2 px-3">
                     {filteredClientes.length} de {pjClients.length} clientes
-                  </small>
+                  </Badge>
                 </Col>
               </Row>
 
