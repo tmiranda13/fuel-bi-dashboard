@@ -1003,13 +1003,13 @@ const Vendas = () => {
                       filteredClientes.slice(0, 10).map((cliente, index) => {
                         // Product color mapping (same as charts)
                         const productColorMap = {
-                          'Gasolina Comum': { bg: '#0088FE', text: 'white' },
-                          'Gasolina Aditivada': { bg: '#00C49F', text: 'white' },
-                          'Etanol': { bg: '#FFBB28', text: 'dark' },
-                          'Diesel S10': { bg: '#FF8042', text: 'white' },
-                          'Diesel S500': { bg: '#8884D8', text: 'white' }
+                          'Gasolina Comum': '#0088FE',
+                          'Gasolina Aditivada': '#00C49F',
+                          'Etanol': '#FFBB28',
+                          'Diesel S10': '#FF8042',
+                          'Diesel S500': '#8884D8'
                         }
-                        const productStyle = productColorMap[cliente.main_product] || { bg: '#6c757d', text: 'white' }
+                        const bgColor = productColorMap[cliente.main_product] || '#6c757d'
 
                         return (
                           <tr key={cliente.client_code || index}>
@@ -1019,9 +1019,17 @@ const Vendas = () => {
                             <td>{Math.round(cliente.current_month_volume).toLocaleString('pt-BR')} L</td>
                             <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cliente.total_revenue)}</td>
                             <td>
-                              <Badge style={{ backgroundColor: productStyle.bg, color: productStyle.text }}>
+                              <span
+                                className="badge"
+                                style={{
+                                  backgroundColor: bgColor,
+                                  color: cliente.main_product === 'Etanol' ? '#212529' : 'white',
+                                  padding: '0.35em 0.65em',
+                                  borderRadius: '0.25rem'
+                                }}
+                              >
                                 {cliente.main_product}
-                              </Badge>
+                              </span>
                             </td>
                           </tr>
                         )
