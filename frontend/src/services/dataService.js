@@ -608,3 +608,183 @@ export const varianceService = {
     return Object.values(byProduct)
   }
 }
+
+// ============================================================
+// PJ CLIENTS SERVICE (Corporate Clients / Pessoa Jurídica)
+// ============================================================
+
+export const pjClientsService = {
+  /**
+   * Get all PJ transactions with pagination
+   */
+  async getPJTransactions(startDate, endDate) {
+    const allData = []
+    let from = 0
+    const pageSize = 1000
+
+    while (true) {
+      let query = supabase
+        .from('pj_client_transactions')
+        .select('*')
+        .eq('company_id', COMPANY_ID)
+
+      if (startDate) query = query.gte('transaction_date', startDate)
+      if (endDate) query = query.lte('transaction_date', endDate)
+
+      query = query.order('transaction_date', { ascending: true }).range(from, from + pageSize - 1)
+
+      const { data, error } = await query
+      if (error) throw error
+
+      if (!data || data.length === 0) break
+
+      allData.push(...data)
+
+      if (data.length < pageSize) break
+
+      from += pageSize
+    }
+
+    return allData
+  },
+
+  /**
+   * Get PJ clients summary (aggregated by client)
+   * Returns: client_name, cnpj, total_volume, total_revenue, main_product, current_month_volume
+   */
+  async getPJClientsSummary(startDate, endDate) {
+    const transactions = await this.getPJTransactions(startDate, endDate)
+
+    // Filter out walk-in customers
+    const pjOnly = transactions.filter(t =>
+      !t.client_name || !t.client_name.toUpperCase().includes('CONSUMIDOR')
+    )
+
+    // Get current month for "current month volume"
+    const now = new Date()
+    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+
+    // Group by client
+    const byClient = pjOnly.reduce((acc, t) => {
+      const key = t.client_code || t.client_name
+
+      if (!acc[key]) {
+        acc[key] = {
+          client_code: t.client_code,
+          client_name: t.client_name,
+          cnpj: t.cnpj,
+          total_volume: 0,
+          total_revenue: 0,
+          current_month_volume: 0,
+          transactions: 0,
+          products: {}
+        }
+      }
+
+      const volume = parseFloat(t.volume || 0)
+      const value = parseFloat(t.total_value || 0)
+
+      acc[key].total_volume += volume
+      acc[key].total_revenue += value
+      acc[key].transactions++
+
+      // Track current month volume
+      if (t.transaction_date >= currentMonthStart) {
+        acc[key].current_month_volume += volume
+      }
+
+      // Track products for main product calculation
+      const product = t.canonical_product_code || t.product_name
+      if (product) {
+        if (!acc[key].products[product]) acc[key].products[product] = 0
+        acc[key].products[product] += volume
+      }
+
+      return acc
+    }, {})
+
+    // Product code to name mapping
+    const codeToName = {
+      'GC': 'Gasolina Comum',
+      'GA': 'Gasolina Aditivada',
+      'ET': 'Etanol',
+      'DS10': 'Diesel S10',
+      'DS500': 'Diesel S500'
+    }
+
+    // Calculate main product for each client
+    return Object.values(byClient).map(client => {
+      let mainProduct = 'N/A'
+      let maxVolume = 0
+
+      Object.entries(client.products).forEach(([product, volume]) => {
+        if (volume > maxVolume) {
+          maxVolume = volume
+          mainProduct = codeToName[product] || product
+        }
+      })
+
+      return {
+        client_code: client.client_code,
+        client_name: client.client_name,
+        cnpj: client.cnpj,
+        total_volume: client.total_volume,
+        total_revenue: client.total_revenue,
+        current_month_volume: client.current_month_volume,
+        main_product: mainProduct,
+        transactions: client.transactions
+      }
+    }).sort((a, b) => b.total_volume - a.total_volume) // Sort by volume desc
+  },
+
+  /**
+   * Get PJ vs Walk-in breakdown
+   * Returns: pj_volume, pj_revenue, pj_clients, totals and percentages
+   */
+  async getPJBreakdown(startDate, endDate, totalSalesVolume, totalSalesRevenue) {
+    const transactions = await this.getPJTransactions(startDate, endDate)
+
+    let pjVolume = 0
+    let pjRevenue = 0
+    let walkinVolume = 0
+    let walkinRevenue = 0
+    const pjClients = new Set()
+
+    transactions.forEach(t => {
+      const volume = parseFloat(t.volume || 0)
+      const value = parseFloat(t.total_value || 0)
+      const isWalkin = t.client_name && t.client_name.toUpperCase().includes('CONSUMIDOR')
+
+      if (isWalkin) {
+        walkinVolume += volume
+        walkinRevenue += value
+      } else {
+        pjVolume += volume
+        pjRevenue += value
+        if (t.client_code) pjClients.add(t.client_code)
+      }
+    })
+
+    // Use pump sales totals if provided, otherwise use transaction totals
+    const totalVolume = totalSalesVolume || (pjVolume + walkinVolume)
+    const totalRevenue = totalSalesRevenue || (pjRevenue + walkinRevenue)
+
+    // Calculate walk-in from pump sales minus PJ
+    const calculatedWalkinVolume = totalSalesVolume ? totalSalesVolume - pjVolume : walkinVolume
+    const calculatedWalkinRevenue = totalSalesRevenue ? totalSalesRevenue - pjRevenue : walkinRevenue
+
+    return {
+      pj_volume: pjVolume,
+      pj_revenue: pjRevenue,
+      pj_clients_count: pjClients.size,
+      pj_volume_percent: totalVolume > 0 ? (pjVolume / totalVolume) * 100 : 0,
+      pj_revenue_percent: totalRevenue > 0 ? (pjRevenue / totalRevenue) * 100 : 0,
+      walkin_volume: calculatedWalkinVolume,
+      walkin_revenue: calculatedWalkinRevenue,
+      walkin_volume_percent: totalVolume > 0 ? (calculatedWalkinVolume / totalVolume) * 100 : 0,
+      walkin_revenue_percent: totalRevenue > 0 ? (calculatedWalkinRevenue / totalRevenue) * 100 : 0,
+      total_volume: totalVolume,
+      total_revenue: totalRevenue
+    }
+  }
+}

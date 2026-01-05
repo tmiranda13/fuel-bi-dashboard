@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Row, Col, Card, Form, Table, Badge, Spinner, Alert, Button, ProgressBar } from 'react-bootstrap'
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchVendasDashboard, fetchKpis, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
+import { pjClientsService } from '../../services/dataService'
 import MockDataBadge, { MockDataCard } from '../MockDataBadge'
 
 const Vendas = () => {
@@ -35,6 +36,11 @@ const Vendas = () => {
   dieselS500: true,
   total: true
 })
+
+  // PJ Clients state
+  const [pjClients, setPjClients] = useState([])
+  const [pjBreakdown, setPjBreakdown] = useState(null)
+  const [pjLoading, setPjLoading] = useState(false)
   
   // Fetch current month projection (independent of date pickers)
   const fetchCurrentMonthProjection = async () => {
@@ -78,23 +84,40 @@ const Vendas = () => {
  const fetchData = async () => {
   try {
     setLoading(true)
+    setPjLoading(true)
     setError(null)
     const [data, kpisData] = await Promise.all([
       fetchVendasDashboard(startDate, endDate),
       fetchKpis()
     ])
     setDashboardData(data)
-    
+
     // Save applied dates
     setAppliedStartDate(startDate)
     setAppliedEndDate(endDate)
-    
+
     // Store all KPIs (multi-month proration will filter by month when calculating)
     setKpis(kpisData)
+
+    // Fetch PJ clients data
+    try {
+      const [pjClientsSummary, pjBreakdownData] = await Promise.all([
+        pjClientsService.getPJClientsSummary(startDate, endDate),
+        pjClientsService.getPJBreakdown(startDate, endDate, data.total_volume, data.total_revenue)
+      ])
+      setPjClients(pjClientsSummary)
+      setPjBreakdown(pjBreakdownData)
+    } catch (pjErr) {
+      console.error('Error fetching PJ data:', pjErr)
+      // Don't fail the whole page if PJ data fails
+      setPjClients([])
+      setPjBreakdown(null)
+    }
   } catch (err) {
     setError(err.message)
   } finally {
     setLoading(false)
+    setPjLoading(false)
   }
 }
 
@@ -230,17 +253,10 @@ const Vendas = () => {
     return target ? Math.round(target) : null
   }
 
-  const clientesPJData = [
-    { id: 1, razaoSocial: 'Transportadora ABC Ltda', cnpj: '12.345.678/0001-90', volumeMes: 25000, faturamento: 125000, produto: 'Diesel S10' },
-    { id: 2, razaoSocial: 'Logística XYZ S/A', cnpj: '98.765.432/0001-10', volumeMes: 18000, faturamento: 90000, produto: 'Diesel S10' },
-    { id: 3, razaoSocial: 'Frota Brasil Transportes', cnpj: '11.222.333/0001-44', volumeMes: 15000, faturamento: 82500, produto: 'Gasolina Comum' },
-    { id: 4, razaoSocial: 'Empresa de Ônibus Rápido', cnpj: '44.555.666/0001-77', volumeMes: 22000, faturamento: 110000, produto: 'Diesel S10' },
-    { id: 5, razaoSocial: 'Táxi Premium Executivo', cnpj: '77.888.999/0001-22', volumeMes: 8500, faturamento: 50000, produto: 'Gasolina Aditivada' }
-  ]
-
-  const filteredClientes = clientesPJData.filter(cliente =>
-    cliente.razaoSocial.toLowerCase().includes(customerFilter.toLowerCase()) ||
-    cliente.cnpj.includes(customerFilter)
+  // Filter PJ clients by search term
+  const filteredClientes = pjClients.filter(cliente =>
+    (cliente.client_name || '').toLowerCase().includes(customerFilter.toLowerCase()) ||
+    (cliente.cnpj || '').includes(customerFilter)
   )
 
   const getVendasStatusBadge = (volumeVendido, metaVolume) => {
@@ -694,11 +710,15 @@ const Vendas = () => {
   </Card>
 </Col>
         <Col md={4} sm={6} className="mb-3">
-          <Card className="h-100 border-warning">
+          <Card className="h-100 border-success">
             <Card.Body>
-              <Card.Title className="text-muted fs-6">Clientes PJ/PF <MockDataBadge /></Card.Title>
-              <Card.Text className="fs-4 fw-bold text-muted">N/A</Card.Text>
-              <small className="text-warning">Sem tracking de clientes</small>
+              <Card.Title className="text-muted fs-6">Clientes PJ <small className="text-success ms-2">✓ Real</small></Card.Title>
+              <Card.Text className="fs-4 fw-bold text-success">
+                {pjBreakdown ? pjBreakdown.pj_clients_count : '...'}
+              </Card.Text>
+              <small className="text-muted">
+                {pjBreakdown ? `${pjBreakdown.pj_volume_percent.toFixed(0)}% do volume total` : 'Carregando...'}
+              </small>
             </Card.Body>
           </Card>
         </Col>
@@ -892,74 +912,138 @@ const Vendas = () => {
     </Card>
   </Col>
 </Row>
-	  <Row className="mb-4">
+      {/* PJ Clients Section */}
+      <Row className="mb-4">
         <Col lg={12}>
-          <MockDataCard title="Clientes Pessoa Jurídica (PJ)">
-            <p className="small text-muted mb-3">
-              Estes dados são simulados - não há tracking de clientes no banco de dados atual.
-              Considere adicionar uma tabela de clientes para habilitar este recurso.
-            </p>
-            <Row className="mb-3">
-              <Col md={6}>
-                <Form.Control
-                  type="text"
-                  placeholder="Buscar por Razão Social ou CNPJ..."
-                  value={customerFilter}
-                  onChange={(e) => setCustomerFilter(e.target.value)}
-                />
-              </Col>
-            </Row>
-            <Table responsive hover>
-              <thead>
-                <tr>
-                  <th>Razão Social</th>
-                  <th>CNPJ</th>
-                  <th>Produto Principal</th>
-                  <th>Volume Mês (L)</th>
-                  <th>Faturamento</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClientes.length > 0 ? (
-                  filteredClientes.map(cliente => (
-                    <tr key={cliente.id}>
-                      <td><strong>{cliente.razaoSocial}</strong></td>
-                      <td>{cliente.cnpj}</td>
-                      <td><Badge bg="info">{cliente.produto}</Badge></td>
-                      <td>{cliente.volumeMes.toLocaleString('pt-BR')} L</td>
-                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cliente.faturamento)}</td>
+          <Card className="border-success">
+            <Card.Header className="bg-success text-white">
+              <strong>Clientes Pessoa Jurídica (PJ)</strong>
+              <small className="ms-2">- Dados do Histórico de Consumo</small>
+            </Card.Header>
+            <Card.Body>
+              {/* PJ Summary Cards */}
+              {pjBreakdown && (
+                <Row className="mb-4">
+                  <Col md={3} sm={6} className="mb-3">
+                    <Card className="h-100 bg-primary bg-opacity-10 border-primary">
+                      <Card.Body className="text-center">
+                        <div className="text-muted small">Clientes PJ</div>
+                        <div className="fs-3 fw-bold text-primary">{pjBreakdown.pj_clients_count}</div>
+                        <small className="text-muted">clientes ativos</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col md={3} sm={6} className="mb-3">
+                    <Card className="h-100 bg-success bg-opacity-10 border-success">
+                      <Card.Body className="text-center">
+                        <div className="text-muted small">Volume PJ</div>
+                        <div className="fs-3 fw-bold text-success">{pjBreakdown.pj_volume_percent.toFixed(1)}%</div>
+                        <small className="text-muted">{Math.round(pjBreakdown.pj_volume).toLocaleString('pt-BR')} L</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col md={3} sm={6} className="mb-3">
+                    <Card className="h-100 bg-info bg-opacity-10 border-info">
+                      <Card.Body className="text-center">
+                        <div className="text-muted small">Faturamento PJ</div>
+                        <div className="fs-3 fw-bold text-info">{pjBreakdown.pj_revenue_percent.toFixed(1)}%</div>
+                        <small className="text-muted">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pjBreakdown.pj_revenue)}</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                  <Col md={3} sm={6} className="mb-3">
+                    <Card className="h-100 bg-secondary bg-opacity-10 border-secondary">
+                      <Card.Body className="text-center">
+                        <div className="text-muted small">Volume Walk-in</div>
+                        <div className="fs-3 fw-bold text-secondary">{pjBreakdown.walkin_volume_percent.toFixed(1)}%</div>
+                        <small className="text-muted">{Math.round(pjBreakdown.walkin_volume).toLocaleString('pt-BR')} L</small>
+                      </Card.Body>
+                    </Card>
+                  </Col>
+                </Row>
+              )}
+
+              {/* Search Filter */}
+              <Row className="mb-3">
+                <Col md={6}>
+                  <Form.Control
+                    type="text"
+                    placeholder="Buscar por Razão Social ou CNPJ..."
+                    value={customerFilter}
+                    onChange={(e) => setCustomerFilter(e.target.value)}
+                  />
+                </Col>
+                <Col md={6} className="text-end">
+                  <small className="text-muted">
+                    {filteredClientes.length} de {pjClients.length} clientes
+                  </small>
+                </Col>
+              </Row>
+
+              {/* Clients Table */}
+              {pjLoading ? (
+                <div className="text-center py-4">
+                  <Spinner animation="border" size="sm" className="me-2" />
+                  Carregando clientes PJ...
+                </div>
+              ) : (
+                <Table responsive hover>
+                  <thead>
+                    <tr>
+                      <th>Razão Social</th>
+                      <th>CNPJ</th>
+                      <th>Volume Total (L)</th>
+                      <th>Volume Mês Atual (L)</th>
+                      <th>Faturamento</th>
+                      <th>Produto Principal</th>
                     </tr>
-                  ))
-                ) : (
-                  <tr><td colSpan="5" className="text-center text-muted">Nenhum cliente encontrado</td></tr>
-                )}
-              </tbody>
-            </Table>
-          </MockDataCard>
+                  </thead>
+                  <tbody>
+                    {filteredClientes.length > 0 ? (
+                      filteredClientes.slice(0, 20).map((cliente, index) => (
+                        <tr key={cliente.client_code || index}>
+                          <td><strong>{cliente.client_name}</strong></td>
+                          <td>{cliente.cnpj || <span className="text-muted">-</span>}</td>
+                          <td>{Math.round(cliente.total_volume).toLocaleString('pt-BR')} L</td>
+                          <td>{Math.round(cliente.current_month_volume).toLocaleString('pt-BR')} L</td>
+                          <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cliente.total_revenue)}</td>
+                          <td><Badge bg="info">{cliente.main_product}</Badge></td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="text-center text-muted py-4">
+                          {pjClients.length === 0 ? 'Nenhum cliente PJ encontrado no período' : 'Nenhum cliente corresponde à busca'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </Table>
+              )}
+              {filteredClientes.length > 20 && (
+                <div className="text-center text-muted small">
+                  Mostrando os 20 maiores clientes por volume. Total: {filteredClientes.length} clientes.
+                </div>
+              )}
+            </Card.Body>
+          </Card>
         </Col>
       </Row>
 
       <Card bg="light" className="mt-3">
         <Card.Body>
           <Row>
-            <Col md={6}>
-              <h6>Dados Reais (Fonte: API)</h6>
+            <Col md={12}>
+              <h6>Dados Reais (Fonte: Supabase)</h6>
               <ul className="small mb-0">
                 <li>Volume Total, Faturamento, Preço Médio</li>
-                <li>Volumes por Produto</li>
-                <li>VMD (Volume Médio Diário) por Produto</li>
+                <li>Volumes por Produto, VMD por Produto</li>
                 <li>Mix de Gasolina (Comum vs Aditivada)</li>
                 <li>Evolução Diária de Vendas</li>
-                <li>Volume Médio MTD (Média Diária)</li>
+                <li>Volume Médio MTD, Volume Projetado</li>
                 <li>Margem Bruta (Calculada)</li>
                 <li>Metas de Volume/Margem/Lucro (Aba Metas)</li>
-              </ul>
-            </Col>
-            <Col md={6}>
-              <h6><MockDataBadge /> Dados Simulados (Não no BD)</h6>
-              <ul className="small mb-0">
-                <li>Clientes PJ/PF</li>
-                <li>Volume Projetado</li>
+                <li>Clientes PJ - Histórico de Consumo (Volume, Faturamento, Produto Principal)</li>
               </ul>
             </Col>
           </Row>
