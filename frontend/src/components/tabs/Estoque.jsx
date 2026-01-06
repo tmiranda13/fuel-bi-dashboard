@@ -246,6 +246,19 @@ const Estoque = () => {
   const varianceSummary = varianceData?.summary || []
   const varianceTotals = varianceData?.totals || { totalGain: 0, totalLoss: 0, totalNet: 0 }
 
+  // Create cost lookup for variance financial calculation
+  const costByProduct = {}
+  estoqueData.forEach(item => {
+    costByProduct[item.produto] = item.custoMedio
+  })
+
+  // Calculate total financial variance
+  const totalFinancialVariance = varianceSummary.reduce((sum, item) => {
+    const productName = normalizeProductName(item.product_name)
+    const cost = costByProduct[productName] || 0
+    return sum + (item.net * cost)
+  }, 0)
+
   return (
     <div>
       <div className="mb-4">
@@ -572,25 +585,37 @@ const Estoque = () => {
                       <th>Total Sobra (L)</th>
                       <th>Total Falta (L)</th>
                       <th>Saldo (L)</th>
+                      <th>Valor (R$)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {varianceSummary.map((item, index) => (
-                      <tr key={index}>
-                        <td><strong>{normalizeProductName(item.product_name)}</strong></td>
-                        <td className="text-success">+{item.total_gain.toFixed(1)}</td>
-                        <td className="text-danger">{item.total_loss.toFixed(1)}</td>
-                        <td className={item.net >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
-                          {item.net >= 0 ? '+' : ''}{item.net.toFixed(1)}
-                        </td>
-                      </tr>
-                    ))}
+                    {varianceSummary.map((item, index) => {
+                      const productName = normalizeProductName(item.product_name)
+                      const cost = costByProduct[productName] || 0
+                      const financialValue = item.net * cost
+                      return (
+                        <tr key={index}>
+                          <td><strong>{productName}</strong></td>
+                          <td className="text-success">+{item.total_gain.toFixed(1)}</td>
+                          <td className="text-danger">{item.total_loss.toFixed(1)}</td>
+                          <td className={item.net >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                            {item.net >= 0 ? '+' : ''}{item.net.toFixed(1)}
+                          </td>
+                          <td className={financialValue >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                            {financialValue >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(financialValue)}
+                          </td>
+                        </tr>
+                      )
+                    })}
                     <tr className="table-secondary">
                       <td><strong>TOTAL</strong></td>
                       <td className="text-success fw-bold">+{varianceTotals.totalGain.toFixed(1)}</td>
                       <td className="text-danger fw-bold">{varianceTotals.totalLoss.toFixed(1)}</td>
                       <td className={varianceTotals.totalNet >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
                         {varianceTotals.totalNet >= 0 ? '+' : ''}{varianceTotals.totalNet.toFixed(1)}
+                      </td>
+                      <td className={totalFinancialVariance >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                        {totalFinancialVariance >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalFinancialVariance)}
                       </td>
                     </tr>
                   </tbody>
