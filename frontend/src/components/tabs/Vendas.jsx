@@ -319,7 +319,7 @@ const Vendas = () => {
   const metrics = {
     volumeTotal: `${parseFloat(dashboardData.total_volume || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L`,
     lucroBruto: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalLucroBruto),
-    precoMedio: `R$ ${parseFloat(dashboardData.avg_price || 0).toFixed(2)}/L`
+    faturamento: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dashboardData.total_revenue || 0)
   }
 
   const gasolinaComumProduct = dashboardData.products?.find(p => p.product_name === 'GASOLINA COMUM')
@@ -690,8 +690,8 @@ const Vendas = () => {
         <Col md={4} sm={6} className="mb-3">
           <Card className="h-100 border-success">
             <Card.Body>
-              <Card.Title className="text-muted fs-6">Preço Médio</Card.Title>
-              <Card.Text className="fs-4 fw-bold text-success">{metrics.precoMedio}</Card.Text>
+              <Card.Title className="text-muted fs-6">Faturamento</Card.Title>
+              <Card.Text className="fs-4 fw-bold text-success">{metrics.faturamento}</Card.Text>
               <small className="text-success">✓ Dados Reais</small>
             </Card.Body>
           </Card>
@@ -1082,7 +1082,7 @@ const Vendas = () => {
             <Col md={12}>
               <h6>Dados Reais (Fonte: Supabase)</h6>
               <ul className="small mb-0">
-                <li>Volume Total, Faturamento, Preço Médio</li>
+                <li>Volume Total, Faturamento, Lucro Bruto</li>
                 <li>Volumes por Produto, VMD por Produto</li>
                 <li>Mix de Gasolina (Comum vs Aditivada)</li>
                 <li>Evolução Diária de Vendas</li>
