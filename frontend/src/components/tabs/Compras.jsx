@@ -403,118 +403,111 @@ const custoMedioData = (() => {
 
   return (
     <div>
-      {/* Header with Filters */}
+      {/* Header with Filters - All in one row */}
       <div className="mb-4">
-        <Row className="align-items-center">
-          <Col md={3}>
-            <h2>Compras</h2>
+        <Row className="align-items-end">
+          <Col md={2}>
+            <h2 className="mb-0">Compras</h2>
           </Col>
-          <Col md={9}>
-            {/* First Row: Dates and Update Button */}
-            <Row className="align-items-center mb-2">
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label className="small mb-1">Data Início</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={startDate}
-                    max={endDate}
-                    onKeyDown={(e) => e.preventDefault()}
-                    onChange={(e) => {
-                      const newDate = e.target.value
-                      if (newDate && newDate <= endDate) {
-                        setStartDate(newDate)
-                        localStorage.setItem('compras_startDate', newDate)
-                      }
-                    }}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label className="small mb-1">Data Fim</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={endDate}
-                    min={startDate}
-                    onKeyDown={(e) => e.preventDefault()}
-                    onChange={(e) => {
-                      const newDate = e.target.value
-                      if (newDate && newDate >= startDate) {
-                        setEndDate(newDate)
-                        localStorage.setItem('compras_endDate', newDate)
-                      }
-                    }}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={4}>
-                <Form.Group>
-                  <Form.Label className="small mb-1">&nbsp;</Form.Label>
-                  <Button
-                    variant="primary"
-                    className="w-100 d-block"
-                    onClick={fetchData}
-                    disabled={loading}
-                  >
-                    {loading ? 'Carregando...' : 'Atualizar'}
-                  </Button>
-                </Form.Group>
-              </Col>
-            </Row>
-            {/* Second Row: Product and Supplier Filters */}
-            <Row className="align-items-center">
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="small mb-1">Produtos</Form.Label>
-                  <Dropdown show={showProductDropdown} onToggle={(isOpen) => setShowProductDropdown(isOpen)}>
-                    <Dropdown.Toggle variant="outline-secondary" className="w-100 text-start">
-                      {selectedProducts.length === 0 ? 'Todos os Produtos' : `${selectedProducts.length} produto(s) selecionado(s)`}
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu className="w-100" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                      <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Form.Check
-                          type="checkbox"
-                          label={<strong>Selecionar Todos</strong>}
-                          checked={selectedProducts.length === availableProducts.length && availableProducts.length > 0}
-                          onChange={handleSelectAllProducts}
-                          className="mb-2"
-                        />
-                        <hr className="my-2" />
-                        {availableProducts.map(product => (
-                          <Form.Check
-                            key={product.code}
-                            type="checkbox"
-                            label={product.name}
-                            checked={selectedProducts.includes(product.code)}
-                            onChange={() => handleProductToggle(product.code)}
-                            className="mb-1"
-                          />
-                        ))}
-                        {availableProducts.length === 0 && (
-                          <small className="text-muted">Nenhum produto disponível</small>
-                        )}
-                      </div>
-                    </Dropdown.Menu>
-                  </Dropdown>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="small mb-1">Fornecedor</Form.Label>
-                  <Form.Select
-                    value={selectedFornecedor}
-                    onChange={(e) => setSelectedFornecedor(e.target.value)}
-                  >
-                    {fornecedores.map(fornecedor => (
-                      <option key={fornecedor.value} value={fornecedor.value}>
-                        {fornecedor.label}
-                      </option>
+          <Col md={2}>
+            <Form.Group>
+              <Form.Label className="small mb-1">Data Início</Form.Label>
+              <Form.Control
+                type="date"
+                size="sm"
+                value={startDate}
+                max={endDate}
+                onKeyDown={(e) => e.preventDefault()}
+                onChange={(e) => {
+                  const newDate = e.target.value
+                  if (newDate && newDate <= endDate) {
+                    setStartDate(newDate)
+                    localStorage.setItem('compras_startDate', newDate)
+                  }
+                }}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={2}>
+            <Form.Group>
+              <Form.Label className="small mb-1">Data Fim</Form.Label>
+              <Form.Control
+                type="date"
+                size="sm"
+                value={endDate}
+                min={startDate}
+                onKeyDown={(e) => e.preventDefault()}
+                onChange={(e) => {
+                  const newDate = e.target.value
+                  if (newDate && newDate >= startDate) {
+                    setEndDate(newDate)
+                    localStorage.setItem('compras_endDate', newDate)
+                  }
+                }}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={2}>
+            <Form.Group>
+              <Form.Label className="small mb-1">Produtos</Form.Label>
+              <Dropdown show={showProductDropdown} onToggle={(isOpen) => setShowProductDropdown(isOpen)}>
+                <Dropdown.Toggle variant="outline-secondary" size="sm" className="w-100 text-start">
+                  {selectedProducts.length === 0 ? 'Todos' : `${selectedProducts.length} sel.`}
+                </Dropdown.Toggle>
+                <Dropdown.Menu style={{ maxHeight: '300px', overflowY: 'auto', minWidth: '200px' }}>
+                  <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <Form.Check
+                      type="checkbox"
+                      label={<strong>Selecionar Todos</strong>}
+                      checked={selectedProducts.length === availableProducts.length && availableProducts.length > 0}
+                      onChange={handleSelectAllProducts}
+                      className="mb-2"
+                    />
+                    <hr className="my-2" />
+                    {availableProducts.map(product => (
+                      <Form.Check
+                        key={product.code}
+                        type="checkbox"
+                        label={product.name}
+                        checked={selectedProducts.includes(product.code)}
+                        onChange={() => handleProductToggle(product.code)}
+                        className="mb-1"
+                      />
                     ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
+                    {availableProducts.length === 0 && (
+                      <small className="text-muted">Nenhum produto disponível</small>
+                    )}
+                  </div>
+                </Dropdown.Menu>
+              </Dropdown>
+            </Form.Group>
+          </Col>
+          <Col md={2}>
+            <Form.Group>
+              <Form.Label className="small mb-1">Fornecedor</Form.Label>
+              <Form.Select
+                size="sm"
+                value={selectedFornecedor}
+                onChange={(e) => setSelectedFornecedor(e.target.value)}
+              >
+                {fornecedores.map(fornecedor => (
+                  <option key={fornecedor.value} value={fornecedor.value}>
+                    {fornecedor.label}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+          </Col>
+          <Col md={2}>
+            <Button
+              variant="primary"
+              size="sm"
+              className="w-100"
+              onClick={fetchData}
+              disabled={loading}
+            >
+              {loading ? '...' : 'Atualizar'}
+            </Button>
           </Col>
         </Row>
       </div>
