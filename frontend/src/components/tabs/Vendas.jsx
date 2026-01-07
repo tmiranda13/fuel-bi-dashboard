@@ -1,9 +1,53 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Row, Col, Card, Form, Table, Badge, Spinner, Alert, Button, ProgressBar } from 'react-bootstrap'
+import { Row, Col, Card, Form, Table, Badge, Spinner, Alert, Button, ProgressBar, Collapse } from 'react-bootstrap'
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchVendasDashboard, fetchKpis, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
 import { pjClientsService } from '../../services/dataService'
 import MockDataBadge, { MockDataCard } from '../MockDataBadge'
+
+// Collapsible Section Component
+const CollapsibleSection = ({ title, storageKey, defaultOpen = false, children, headerBg = 'primary', headerIcon = null }) => {
+  const [isOpen, setIsOpen] = useState(() => {
+    const stored = localStorage.getItem(`vendas_section_${storageKey}`)
+    if (stored !== null) return stored === 'true'
+    return defaultOpen
+  })
+
+  const toggle = () => {
+    const newState = !isOpen
+    setIsOpen(newState)
+    localStorage.setItem(`vendas_section_${storageKey}`, String(newState))
+  }
+
+  return (
+    <Card className={`mb-4 border-${headerBg}`}>
+      <Card.Header
+        className={`bg-${headerBg} text-white d-flex justify-content-between align-items-center`}
+        style={{ cursor: 'pointer' }}
+        onClick={toggle}
+      >
+        <div>
+          {headerIcon && <span className="me-2">{headerIcon}</span>}
+          <strong>{title}</strong>
+        </div>
+        <span style={{
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          fontSize: '1.2rem'
+        }}>
+          ▼
+        </span>
+      </Card.Header>
+      <Collapse in={isOpen}>
+        <div>
+          <Card.Body>
+            {children}
+          </Card.Body>
+        </div>
+      </Collapse>
+    </Card>
+  )
+}
 
 const Vendas = () => {
   const [startDate, setStartDate] = useState(() => {
@@ -475,189 +519,182 @@ const Vendas = () => {
       </div>
 
       {kpis.length > 0 && (
-        <Row className="mb-4">
-          <Col lg={12}>
-            <Card className="border-primary">
-              <Card.Header className="bg-primary text-white">
-                <strong>Metas do Mes</strong>
-                <small className="ms-2">- Configuradas na aba Metas</small>
-              </Card.Header>
-              <Card.Body>
-                <Row>
-                  {getKpiTarget('sales_volume', null) && (
-                    <Col md={3} className="mb-3">
-                      <Card className="h-100">
-                        <Card.Body className="p-3">
+        <CollapsibleSection
+          title="Metas do Mês"
+          storageKey="metas"
+          defaultOpen={true}
+          headerBg="primary"
+        >
+          <Row>
+            {getKpiTarget('sales_volume', null) && (
+              <Col md={3} className="mb-3">
+                <Card className="h-100">
+                  <Card.Body className="p-3">
+                    <div className="d-flex justify-content-between mb-2">
+                      <small className="text-muted">Volume Total</small>
+                      <Badge bg={calcProgress(dashboardData.total_volume, getKpiTarget('sales_volume', null)) >= 100 ? 'success' : 'warning'}>
+                        {calcProgress(dashboardData.total_volume, getKpiTarget('sales_volume', null)).toFixed(0)}%
+                      </Badge>
+                    </div>
+                    <div className="mb-2">
+                      <strong>{Math.round(dashboardData.total_volume).toLocaleString('pt-BR')} L</strong>
+                      <small className="text-muted"> / {getKpiTarget('sales_volume', null).toLocaleString('pt-BR')} L</small>
+                    </div>
+                    <ProgressBar
+                      now={calcProgress(dashboardData.total_volume, getKpiTarget('sales_volume', null))}
+                      variant={getProgressVariant(calcProgress(dashboardData.total_volume, getKpiTarget('sales_volume', null)))}
+                      style={{ height: '8px' }}
+                    />
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
+            {getKpiTarget('revenue', null) && (
+              <Col md={3} className="mb-3">
+                <Card className="h-100">
+                  <Card.Body className="p-3">
+                    <div className="d-flex justify-content-between mb-2">
+                      <small className="text-muted">Lucro Bruto</small>
+                      <Badge bg={calcProgress(totalLucroBruto, getKpiTarget('revenue', null)) >= 100 ? 'success' : 'warning'}>
+                        {calcProgress(totalLucroBruto, getKpiTarget('revenue', null)).toFixed(0)}%
+                      </Badge>
+                    </div>
+                    <div className="mb-2">
+                      <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalLucroBruto)}</strong>
+                      <small className="text-muted"> / {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(getKpiTarget('revenue', null))}</small>
+                    </div>
+                    <ProgressBar
+                      now={calcProgress(totalLucroBruto, getKpiTarget('revenue', null))}
+                      variant={getProgressVariant(calcProgress(totalLucroBruto, getKpiTarget('revenue', null)))}
+                      style={{ height: '8px' }}
+                    />
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
+            {getMixTarget('gasolina') && (
+              <Col md={3} className="mb-3">
+                <Card className="h-100">
+                  <Card.Body className="p-3">
+                    <div className="d-flex justify-content-between mb-2">
+                      <small className="text-muted">Mix GA</small>
+                      <Badge bg={parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'success' : 'warning'}>
+                        {parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'Atingido' : 'Em Progresso'}
+                      </Badge>
+                    </div>
+                    <div className="mb-2">
+                      <strong>{mixGasolinaAditivada}%</strong>
+                      <small className="text-muted"> / {getMixTarget('gasolina')}%</small>
+                    </div>
+                    <ProgressBar
+                      now={calcProgress(parseFloat(mixGasolinaAditivada), getMixTarget('gasolina'))}
+                      variant={getProgressVariant(calcProgress(parseFloat(mixGasolinaAditivada), getMixTarget('gasolina')))}
+                      style={{ height: '8px' }}
+                    />
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
+            {getKpiTarget('margin', null) && (
+              <Col md={3} className="mb-3">
+                <Card className="h-100">
+                  <Card.Body className="p-3">
+                    {(() => {
+                      const avgMargin = vendasPorProduto.length > 0
+                        ? vendasPorProduto.reduce((sum, p) => sum + p.margemBruta, 0) / vendasPorProduto.length
+                        : 0
+                      return (
+                        <>
                           <div className="d-flex justify-content-between mb-2">
-                            <small className="text-muted">Volume Total</small>
-                            <Badge bg={calcProgress(dashboardData.total_volume, getKpiTarget('sales_volume', null)) >= 100 ? 'success' : 'warning'}>
-                              {calcProgress(dashboardData.total_volume, getKpiTarget('sales_volume', null)).toFixed(0)}%
+                            <small className="text-muted">Margem Bruta Media</small>
+                            <Badge bg={avgMargin >= getKpiTarget('margin', null) ? 'success' : 'warning'}>
+                              {avgMargin >= getKpiTarget('margin', null) ? 'Atingido' : 'Em Progresso'}
                             </Badge>
                           </div>
                           <div className="mb-2">
-                            <strong>{Math.round(dashboardData.total_volume).toLocaleString('pt-BR')} L</strong>
-                            <small className="text-muted"> / {getKpiTarget('sales_volume', null).toLocaleString('pt-BR')} L</small>
+                            <strong>{avgMargin.toFixed(1)}%</strong>
+                            <small className="text-muted"> / {getKpiTarget('margin', null)}%</small>
                           </div>
                           <ProgressBar
-                            now={calcProgress(dashboardData.total_volume, getKpiTarget('sales_volume', null))}
-                            variant={getProgressVariant(calcProgress(dashboardData.total_volume, getKpiTarget('sales_volume', null)))}
+                            now={calcProgress(avgMargin, getKpiTarget('margin', null))}
+                            variant={getProgressVariant(calcProgress(avgMargin, getKpiTarget('margin', null)))}
                             style={{ height: '8px' }}
                           />
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  )}
-                  {getKpiTarget('revenue', null) && (
-                    <Col md={3} className="mb-3">
-                      <Card className="h-100">
-                        <Card.Body className="p-3">
-                          <div className="d-flex justify-content-between mb-2">
-                            <small className="text-muted">Lucro Bruto</small>
-                            <Badge bg={calcProgress(totalLucroBruto, getKpiTarget('revenue', null)) >= 100 ? 'success' : 'warning'}>
-                              {calcProgress(totalLucroBruto, getKpiTarget('revenue', null)).toFixed(0)}%
-                            </Badge>
-                          </div>
-                          <div className="mb-2">
-                            <strong>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalLucroBruto)}</strong>
-                            <small className="text-muted"> / {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(getKpiTarget('revenue', null))}</small>
-                          </div>
-                          <ProgressBar
-                            now={calcProgress(totalLucroBruto, getKpiTarget('revenue', null))}
-                            variant={getProgressVariant(calcProgress(totalLucroBruto, getKpiTarget('revenue', null)))}
-                            style={{ height: '8px' }}
-                          />
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  )}
-                  {getMixTarget('gasolina') && (
-                    <Col md={3} className="mb-3">
-                      <Card className="h-100">
-                        <Card.Body className="p-3">
-                          <div className="d-flex justify-content-between mb-2">
-                            <small className="text-muted">Mix GA</small>
-                            <Badge bg={parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'success' : 'warning'}>
-                              {parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'Atingido' : 'Em Progresso'}
-                            </Badge>
-                          </div>
-                          <div className="mb-2">
-                            <strong>{mixGasolinaAditivada}%</strong>
-                            <small className="text-muted"> / {getMixTarget('gasolina')}%</small>
-                          </div>
-                          <ProgressBar
-                            now={calcProgress(parseFloat(mixGasolinaAditivada), getMixTarget('gasolina'))}
-                            variant={getProgressVariant(calcProgress(parseFloat(mixGasolinaAditivada), getMixTarget('gasolina')))}
-                            style={{ height: '8px' }}
-                          />
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  )}
-                  {getKpiTarget('margin', null) && (
-                    <Col md={3} className="mb-3">
-                      <Card className="h-100">
-                        <Card.Body className="p-3">
-                          {(() => {
-                            const avgMargin = vendasPorProduto.length > 0
-                              ? vendasPorProduto.reduce((sum, p) => sum + p.margemBruta, 0) / vendasPorProduto.length
-                              : 0
-                            return (
-                              <>
-                                <div className="d-flex justify-content-between mb-2">
-                                  <small className="text-muted">Margem Bruta Media</small>
-                                  <Badge bg={avgMargin >= getKpiTarget('margin', null) ? 'success' : 'warning'}>
-                                    {avgMargin >= getKpiTarget('margin', null) ? 'Atingido' : 'Em Progresso'}
-                                  </Badge>
-                                </div>
-                                <div className="mb-2">
-                                  <strong>{avgMargin.toFixed(1)}%</strong>
-                                  <small className="text-muted"> / {getKpiTarget('margin', null)}%</small>
-                                </div>
-                                <ProgressBar
-                                  now={calcProgress(avgMargin, getKpiTarget('margin', null))}
-                                  variant={getProgressVariant(calcProgress(avgMargin, getKpiTarget('margin', null)))}
-                                  style={{ height: '8px' }}
-                                />
-                              </>
-                            )
-                          })()}
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  )}
-                </Row>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+                        </>
+                      )
+                    })()}
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
+          </Row>
+        </CollapsibleSection>
       )}
 
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card>
-            <Card.Body>
-              <Card.Title>Desempenho de Vendas por Produto</Card.Title>
-              <p className="small text-muted mb-3">
-                {kpis.length > 0 ? 'Metas configuradas na aba Metas' : 'Configure metas na aba Metas para ver o progresso'}
-              </p>
-              <Table responsive hover>
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Volume Vendido (L)</th>
-                    <th>VMD (L)</th>
-                    <th>Alvo de Volume (L)</th>
-                    <th>% da Meta</th>
-                    <th>Preco Medio (R$/L)</th>
-                    <th>Lucro Bruto</th>
-                    <th>Margem Bruta (%)</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendasPorProduto.map(item => {
-                    const percentualMeta = item.metaVolume ? (item.volumeVendido / item.metaVolume) * 100 : null
-                    const rowClass = percentualMeta === null ? '' : percentualMeta < 80 ? 'table-danger' : percentualMeta < 90 ? 'table-warning' : percentualMeta < 100 ? 'table-info' : 'table-success'
-                    return (
-                      <tr key={item.id} className={rowClass}>
-                        <td><strong>{item.produto}</strong></td>
-                        <td>{Math.round(item.volumeVendido).toLocaleString('pt-BR')} L</td>
-                        <td>{Math.round(item.vmd).toLocaleString('pt-BR')} L</td>
-                        <td>{item.metaVolume ? `${item.metaVolume.toLocaleString('pt-BR')} L` : <span className="text-muted">-</span>}</td>
-                        <td>
-                          {percentualMeta !== null ? (
-                            <strong className={percentualMeta >= 100 ? 'text-success' : percentualMeta >= 90 ? 'text-info' : 'text-warning'}>
-                              {percentualMeta.toFixed(1)}%
-                            </strong>
-                          ) : <span className="text-muted">-</span>}
-                        </td>
-                        <td>R$ {item.precoMedio.toFixed(2)}/L</td>
-                        <td>
-                          <strong className={item.metaLucroBruto ? (item.lucroBruto >= item.metaLucroBruto ? 'text-success' : 'text-danger') : (item.lucroBruto >= 0 ? 'text-success' : 'text-danger')}>
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.lucroBruto)}
-                          </strong>
-                          {item.metaLucroBruto && (
-                            <small className="text-muted ms-1 d-block">
-                              (meta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.metaLucroBruto)})
-                            </small>
-                          )}
-                        </td>
-                        <td>
-                          <strong className={item.metaMargem ? (item.margemBruta >= item.metaMargem ? 'text-success' : 'text-danger') : (item.margemBruta >= 15 ? 'text-success' : item.margemBruta >= 10 ? 'text-warning' : 'text-danger')}>
-                            {item.margemBruta.toFixed(2)}%
-                          </strong>
-                          {item.metaMargem && <small className="text-muted ms-1">(meta: {item.metaMargem}%)</small>}
-                        </td>
-                        <td>{getVendasStatusBadge(item.volumeVendido, item.metaVolume)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      <CollapsibleSection
+        title="Desempenho de Vendas por Produto"
+        storageKey="desempenho"
+        defaultOpen={false}
+        headerBg="secondary"
+      >
+        <p className="small text-muted mb-3">
+          {kpis.length > 0 ? 'Metas configuradas na aba Metas' : 'Configure metas na aba Metas para ver o progresso'}
+        </p>
+        <Table responsive hover>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Volume Vendido (L)</th>
+              <th>VMD (L)</th>
+              <th>Alvo de Volume (L)</th>
+              <th>% da Meta</th>
+              <th>Preco Medio (R$/L)</th>
+              <th>Lucro Bruto</th>
+              <th>Margem Bruta (%)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {vendasPorProduto.map(item => {
+              const percentualMeta = item.metaVolume ? (item.volumeVendido / item.metaVolume) * 100 : null
+              const rowClass = percentualMeta === null ? '' : percentualMeta < 80 ? 'table-danger' : percentualMeta < 90 ? 'table-warning' : percentualMeta < 100 ? 'table-info' : 'table-success'
+              return (
+                <tr key={item.id} className={rowClass}>
+                  <td><strong>{item.produto}</strong></td>
+                  <td>{Math.round(item.volumeVendido).toLocaleString('pt-BR')} L</td>
+                  <td>{Math.round(item.vmd).toLocaleString('pt-BR')} L</td>
+                  <td>{item.metaVolume ? `${item.metaVolume.toLocaleString('pt-BR')} L` : <span className="text-muted">-</span>}</td>
+                  <td>
+                    {percentualMeta !== null ? (
+                      <strong className={percentualMeta >= 100 ? 'text-success' : percentualMeta >= 90 ? 'text-info' : 'text-warning'}>
+                        {percentualMeta.toFixed(1)}%
+                      </strong>
+                    ) : <span className="text-muted">-</span>}
+                  </td>
+                  <td>R$ {item.precoMedio.toFixed(2)}/L</td>
+                  <td>
+                    <strong className={item.metaLucroBruto ? (item.lucroBruto >= item.metaLucroBruto ? 'text-success' : 'text-danger') : (item.lucroBruto >= 0 ? 'text-success' : 'text-danger')}>
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.lucroBruto)}
+                    </strong>
+                    {item.metaLucroBruto && (
+                      <small className="text-muted ms-1 d-block">
+                        (meta: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.metaLucroBruto)})
+                      </small>
+                    )}
+                  </td>
+                  <td>
+                    <strong className={item.metaMargem ? (item.margemBruta >= item.metaMargem ? 'text-success' : 'text-danger') : (item.margemBruta >= 15 ? 'text-success' : item.margemBruta >= 10 ? 'text-warning' : 'text-danger')}>
+                      {item.margemBruta.toFixed(2)}%
+                    </strong>
+                    {item.metaMargem && <small className="text-muted ms-1">(meta: {item.metaMargem}%)</small>}
+                  </td>
+                  <td>{getVendasStatusBadge(item.volumeVendido, item.metaVolume)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </Table>
+      </CollapsibleSection>
 	  <Row className="mb-4">
         <Col md={4} sm={6} className="mb-3">
           <Card className={`h-100 ${getKpiTarget('sales_volume', null) ? (dashboardData.total_volume >= getKpiTarget('sales_volume', null) ? 'border-success' : 'border-warning') : 'border-success'}`}>
@@ -739,62 +776,61 @@ const Vendas = () => {
 </Col>
       </Row>
 
-      <Row className="mb-4">
-  <Col lg={12} className="mb-3">
-    <Card className="border-success">
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <Card.Title className="mb-0">Evolução de Volume Diário <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-          <div className="d-flex flex-wrap gap-3">
-            <Form.Check
-              inline
-              type="checkbox"
-              id="filter-gc"
-              label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
-              checked={selectedFuels.gasolinaComum}
-              onChange={(e) => setSelectedFuels({ ...selectedFuels, gasolinaComum: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="filter-ga"
-              label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
-              checked={selectedFuels.gasolinaAditivada}
-              onChange={(e) => setSelectedFuels({ ...selectedFuels, gasolinaAditivada: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="filter-et"
-              label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
-              checked={selectedFuels.etanol}
-              onChange={(e) => setSelectedFuels({ ...selectedFuels, etanol: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="filter-ds10"
-              label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
-              checked={selectedFuels.dieselS10}
-              onChange={(e) => setSelectedFuels({ ...selectedFuels, dieselS10: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="filter-ds500"
-              label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
-              checked={selectedFuels.dieselS500}
-              onChange={(e) => setSelectedFuels({ ...selectedFuels, dieselS500: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="filter-total"
-              label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
-              checked={selectedFuels.total}
-              onChange={(e) => setSelectedFuels({ ...selectedFuels, total: e.target.checked })}
-            />
-          </div>
+      <CollapsibleSection
+        title="Evolução de Volume Diário"
+        storageKey="evolucao"
+        defaultOpen={false}
+        headerBg="info"
+      >
+        <div className="d-flex flex-wrap gap-3 mb-3">
+          <Form.Check
+            inline
+            type="checkbox"
+            id="filter-gc"
+            label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
+            checked={selectedFuels.gasolinaComum}
+            onChange={(e) => setSelectedFuels({ ...selectedFuels, gasolinaComum: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="filter-ga"
+            label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
+            checked={selectedFuels.gasolinaAditivada}
+            onChange={(e) => setSelectedFuels({ ...selectedFuels, gasolinaAditivada: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="filter-et"
+            label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
+            checked={selectedFuels.etanol}
+            onChange={(e) => setSelectedFuels({ ...selectedFuels, etanol: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="filter-ds10"
+            label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
+            checked={selectedFuels.dieselS10}
+            onChange={(e) => setSelectedFuels({ ...selectedFuels, dieselS10: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="filter-ds500"
+            label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
+            checked={selectedFuels.dieselS500}
+            onChange={(e) => setSelectedFuels({ ...selectedFuels, dieselS500: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="filter-total"
+            label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
+            checked={selectedFuels.total}
+            onChange={(e) => setSelectedFuels({ ...selectedFuels, total: e.target.checked })}
+          />
         </div>
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={volumeDataPerProduct}>
@@ -811,10 +847,7 @@ const Vendas = () => {
             {selectedFuels.total && <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />}
           </LineChart>
         </ResponsiveContainer>
-      </Card.Body>
-    </Card>
-  </Col>
-</Row>
+      </CollapsibleSection>
 
 <Row className="mb-4">
   <Col lg={4} className="mb-3">
@@ -913,168 +946,163 @@ const Vendas = () => {
   </Col>
 </Row>
       {/* PJ Clients Section */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card className="border-success">
-            <Card.Header className="bg-success text-white">
-              <strong>Clientes Pessoa Jurídica (PJ)</strong>
-              <small className="ms-2">- Dados do Histórico de Consumo</small>
-            </Card.Header>
-            <Card.Body>
-              {/* PJ Summary Cards */}
-              {pjBreakdown && (
-                <Row className="mb-4">
-                  <Col md={3} sm={6} className="mb-3">
-                    <Card className="h-100 bg-primary bg-opacity-10 border-primary">
-                      <Card.Body className="text-center">
-                        <div className="text-muted small">Clientes PJ</div>
-                        <div className="fs-3 fw-bold text-primary">{pjBreakdown.pj_clients_count}</div>
-                        <small className="text-muted">clientes ativos</small>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={3} sm={6} className="mb-3">
-                    <Card className="h-100 bg-success bg-opacity-10 border-success">
-                      <Card.Body className="text-center">
-                        <div className="text-muted small">Volume PJ</div>
-                        <div className="fs-3 fw-bold text-success">{pjBreakdown.pj_volume_percent.toFixed(1)}%</div>
-                        <small className="text-muted">{Math.round(pjBreakdown.pj_volume).toLocaleString('pt-BR')} L</small>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={3} sm={6} className="mb-3">
-                    <Card className="h-100 bg-info bg-opacity-10 border-info">
-                      <Card.Body className="text-center">
-                        <div className="text-muted small">Faturamento PJ</div>
-                        <div className="fs-3 fw-bold text-info">{pjBreakdown.pj_revenue_percent.toFixed(1)}%</div>
-                        <small className="text-muted">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pjBreakdown.pj_revenue)}</small>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                  <Col md={3} sm={6} className="mb-3">
-                    <Card className="h-100 bg-secondary bg-opacity-10 border-secondary">
-                      <Card.Body className="text-center">
-                        <div className="text-muted small">Volume Walk-in</div>
-                        <div className="fs-3 fw-bold text-secondary">{pjBreakdown.walkin_volume_percent.toFixed(1)}%</div>
-                        <small className="text-muted">{Math.round(pjBreakdown.walkin_volume).toLocaleString('pt-BR')} L</small>
-                      </Card.Body>
-                    </Card>
-                  </Col>
-                </Row>
-              )}
+      <CollapsibleSection
+        title="Clientes Pessoa Jurídica (PJ)"
+        storageKey="pj_clients"
+        defaultOpen={false}
+        headerBg="success"
+      >
+        {/* PJ Summary Cards */}
+        {pjBreakdown && (
+          <Row className="mb-4">
+            <Col md={3} sm={6} className="mb-3">
+              <Card className="h-100 bg-primary bg-opacity-10 border-primary">
+                <Card.Body className="text-center">
+                  <div className="text-muted small">Clientes PJ</div>
+                  <div className="fs-3 fw-bold text-primary">{pjBreakdown.pj_clients_count}</div>
+                  <small className="text-muted">clientes ativos</small>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={3} sm={6} className="mb-3">
+              <Card className="h-100 bg-success bg-opacity-10 border-success">
+                <Card.Body className="text-center">
+                  <div className="text-muted small">Volume PJ</div>
+                  <div className="fs-3 fw-bold text-success">{pjBreakdown.pj_volume_percent.toFixed(1)}%</div>
+                  <small className="text-muted">{Math.round(pjBreakdown.pj_volume).toLocaleString('pt-BR')} L</small>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={3} sm={6} className="mb-3">
+              <Card className="h-100 bg-info bg-opacity-10 border-info">
+                <Card.Body className="text-center">
+                  <div className="text-muted small">Faturamento PJ</div>
+                  <div className="fs-3 fw-bold text-info">{pjBreakdown.pj_revenue_percent.toFixed(1)}%</div>
+                  <small className="text-muted">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pjBreakdown.pj_revenue)}</small>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={3} sm={6} className="mb-3">
+              <Card className="h-100 bg-secondary bg-opacity-10 border-secondary">
+                <Card.Body className="text-center">
+                  <div className="text-muted small">Volume Walk-in</div>
+                  <div className="fs-3 fw-bold text-secondary">{pjBreakdown.walkin_volume_percent.toFixed(1)}%</div>
+                  <small className="text-muted">{Math.round(pjBreakdown.walkin_volume).toLocaleString('pt-BR')} L</small>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        )}
 
-              {/* Search Filter */}
-              <Row className="mb-3 align-items-center">
-                <Col md={6}>
-                  <div className="position-relative">
-                    <span
-                      className="position-absolute"
-                      style={{
-                        left: '12px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: '#6c757d',
-                        fontSize: '1.1rem'
-                      }}
-                    >
-                      🔍
-                    </span>
-                    <Form.Control
-                      type="text"
-                      placeholder="Buscar cliente por Razão Social ou CNPJ..."
-                      value={customerFilter}
-                      onChange={(e) => setCustomerFilter(e.target.value)}
-                      style={{
-                        paddingLeft: '40px',
-                        backgroundColor: '#f8f9fa',
-                        border: '2px solid #dee2e6',
-                        borderRadius: '8px',
-                        fontSize: '0.95rem'
-                      }}
-                      className="shadow-sm"
-                    />
-                  </div>
-                </Col>
-                <Col md={6} className="text-end">
-                  <Badge bg="secondary" className="py-2 px-3">
-                    {filteredClientes.length} de {pjClients.length} clientes
-                  </Badge>
-                </Col>
-              </Row>
+        {/* Search Filter */}
+        <Row className="mb-3 align-items-center">
+          <Col md={6}>
+            <div className="position-relative">
+              <span
+                className="position-absolute"
+                style={{
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#6c757d',
+                  fontSize: '1.1rem'
+                }}
+              >
+                🔍
+              </span>
+              <Form.Control
+                type="text"
+                placeholder="Buscar cliente por Razão Social ou CNPJ..."
+                value={customerFilter}
+                onChange={(e) => setCustomerFilter(e.target.value)}
+                style={{
+                  paddingLeft: '40px',
+                  backgroundColor: '#f8f9fa',
+                  border: '2px solid #dee2e6',
+                  borderRadius: '8px',
+                  fontSize: '0.95rem'
+                }}
+                className="shadow-sm"
+              />
+            </div>
+          </Col>
+          <Col md={6} className="text-end">
+            <Badge bg="secondary" className="py-2 px-3">
+              {filteredClientes.length} de {pjClients.length} clientes
+            </Badge>
+          </Col>
+        </Row>
 
-              {/* Clients Table */}
-              {pjLoading ? (
-                <div className="text-center py-4">
-                  <Spinner animation="border" size="sm" className="me-2" />
-                  Carregando clientes PJ...
-                </div>
-              ) : (
-                <Table responsive hover>
-                  <thead>
-                    <tr>
-                      <th>Razão Social</th>
-                      <th>CNPJ</th>
-                      <th>Volume Total (L)</th>
-                      <th>Volume Mês Atual (L)</th>
-                      <th>Faturamento</th>
-                      <th>Produto Principal</th>
+        {/* Clients Table */}
+        {pjLoading ? (
+          <div className="text-center py-4">
+            <Spinner animation="border" size="sm" className="me-2" />
+            Carregando clientes PJ...
+          </div>
+        ) : (
+          <Table responsive hover>
+            <thead>
+              <tr>
+                <th>Razão Social</th>
+                <th>CNPJ</th>
+                <th>Volume Total (L)</th>
+                <th>Volume Mês Atual (L)</th>
+                <th>Faturamento</th>
+                <th>Produto Principal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredClientes.length > 0 ? (
+                filteredClientes.slice(0, 10).map((cliente, index) => {
+                  // Product color mapping (same as charts)
+                  const productColorMap = {
+                    'Gasolina Comum': '#0088FE',
+                    'Gasolina Aditivada': '#00C49F',
+                    'Etanol': '#FFBB28',
+                    'Diesel S10': '#FF8042',
+                    'Diesel S500': '#8884D8'
+                  }
+                  const bgColor = productColorMap[cliente.main_product] || '#6c757d'
+
+                  return (
+                    <tr key={cliente.client_code || index}>
+                      <td><strong>{cliente.client_name}</strong></td>
+                      <td>{cliente.cnpj || <span className="text-muted">-</span>}</td>
+                      <td>{Math.round(cliente.total_volume).toLocaleString('pt-BR')} L</td>
+                      <td>{Math.round(cliente.current_month_volume).toLocaleString('pt-BR')} L</td>
+                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cliente.total_revenue)}</td>
+                      <td>
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: bgColor,
+                            color: cliente.main_product === 'Etanol' ? '#212529' : 'white',
+                            padding: '0.35em 0.65em',
+                            borderRadius: '0.25rem'
+                          }}
+                        >
+                          {cliente.main_product}
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredClientes.length > 0 ? (
-                      filteredClientes.slice(0, 10).map((cliente, index) => {
-                        // Product color mapping (same as charts)
-                        const productColorMap = {
-                          'Gasolina Comum': '#0088FE',
-                          'Gasolina Aditivada': '#00C49F',
-                          'Etanol': '#FFBB28',
-                          'Diesel S10': '#FF8042',
-                          'Diesel S500': '#8884D8'
-                        }
-                        const bgColor = productColorMap[cliente.main_product] || '#6c757d'
-
-                        return (
-                          <tr key={cliente.client_code || index}>
-                            <td><strong>{cliente.client_name}</strong></td>
-                            <td>{cliente.cnpj || <span className="text-muted">-</span>}</td>
-                            <td>{Math.round(cliente.total_volume).toLocaleString('pt-BR')} L</td>
-                            <td>{Math.round(cliente.current_month_volume).toLocaleString('pt-BR')} L</td>
-                            <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cliente.total_revenue)}</td>
-                            <td>
-                              <span
-                                className="badge"
-                                style={{
-                                  backgroundColor: bgColor,
-                                  color: cliente.main_product === 'Etanol' ? '#212529' : 'white',
-                                  padding: '0.35em 0.65em',
-                                  borderRadius: '0.25rem'
-                                }}
-                              >
-                                {cliente.main_product}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan="6" className="text-center text-muted py-4">
-                          {pjClients.length === 0 ? 'Nenhum cliente PJ encontrado no período' : 'Nenhum cliente corresponde à busca'}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </Table>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan="6" className="text-center text-muted py-4">
+                    {pjClients.length === 0 ? 'Nenhum cliente PJ encontrado no período' : 'Nenhum cliente corresponde à busca'}
+                  </td>
+                </tr>
               )}
-              {filteredClientes.length > 10 && (
-                <div className="text-center text-muted small">
-                  Mostrando os 10 maiores clientes por volume. Total: {filteredClientes.length} clientes.
-                </div>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+            </tbody>
+          </Table>
+        )}
+        {filteredClientes.length > 10 && (
+          <div className="text-center text-muted small">
+            Mostrando os 10 maiores clientes por volume. Total: {filteredClientes.length} clientes.
+          </div>
+        )}
+      </CollapsibleSection>
 
       <Card bg="light" className="mt-3">
         <Card.Body>
