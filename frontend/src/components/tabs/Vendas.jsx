@@ -1104,25 +1104,7 @@ const Vendas = () => {
         )}
       </CollapsibleSection>
 
-      <Card bg="light" className="mt-3">
-        <Card.Body>
-          <Row>
-            <Col md={12}>
-              <h6>Dados Reais (Fonte: Supabase)</h6>
-              <ul className="small mb-0">
-                <li>Volume Total, Faturamento, Lucro Bruto</li>
-                <li>Volumes por Produto, VMD por Produto</li>
-                <li>Mix de Gasolina (Comum vs Aditivada)</li>
-                <li>Evolução Diária de Vendas</li>
-                <li>Volume Médio MTD, Volume Projetado</li>
-                <li>Margem Bruta (Calculada)</li>
-                <li>Metas de Volume/Margem/Lucro (Aba Metas)</li>
-                <li>Clientes PJ - Histórico de Consumo (Volume, Faturamento, Produto Principal)</li>
-              </ul>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
+      <div style={{ paddingBottom: '2rem' }} />
     </div>
   )
 }

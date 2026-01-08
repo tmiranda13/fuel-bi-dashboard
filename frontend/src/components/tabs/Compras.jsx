@@ -868,32 +868,7 @@ const custoMedioData = (() => {
         </Col>
       </Row>
 
-      {/* Legend */}
-      <Card bg="light" className="mt-3">
-        <Card.Body>
-          <Row>
-            <Col md={6}>
-              <h6>✓ Dados Reais (Fonte: API)</h6>
-              <ul className="small mb-0">
-                <li>Volume Total e Custo Total</li>
-                <li>Custo Médio Ponderado</li>
-                <li>Volumes e Custos por Produto</li>
-                <li>Análise por Fornecedor (com CNPJ)</li>
-                <li>Evolução de Custo Médio Diário</li>
-              </ul>
-            </Col>
-            <Col md={6}>
-              <h6>
-                <MockDataBadge /> Dados Simulados (Não no BD)
-              </h6>
-              <ul className="small mb-0">
-                <li>Fornecedor Principal por Produto</li>
-                <li>Custos de Frete por NF</li>
-              </ul>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
+      <div style={{ paddingBottom: '2rem' }} />
     </div>
   )
 }

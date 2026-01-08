@@ -656,51 +656,7 @@ const Estoque = () => {
         </Col>
       </Row>
 
-      <Card bg="light" className="mt-3">
-        <Card.Body>
-          <Row>
-            <Col md={4}>
-              <h6>✓ Dados Reais (Fonte: API)</h6>
-              <ul className="small mb-0">
-                <li>Capacidade do Tanque (medição física)</li>
-                <li>Estoque Atual (medição física do tanque)</li>
-                <li>Ocupação % (Estoque / Capacidade)</li>
-                <li>Dias de Autonomia (Estoque / VMD)</li>
-                <li>Custo Médio (R$/L)</li>
-                <li>Custo do Estoque (Custo Médio × Estoque)</li>
-              </ul>
-            </Col>
-            <Col md={4}>
-              <h6>✓ Variação de Estoque</h6>
-              <ul className="small mb-0">
-                <li>Diferença = Medição Física - Estoque Calculado</li>
-                <li>Positivo (Sobra) = Mais combustível que o esperado</li>
-                <li>Negativo (Falta) = Menos combustível que o esperado</li>
-                <li>Extraído do relatório RESUMO DO DIA</li>
-              </ul>
-            </Col>
-            <Col md={4}>
-              <h6>✓ Evolução de Estoque</h6>
-              <ul className="small mb-0">
-                <li>Calculado a partir de compras e vendas</li>
-                <li>Ponto final = medição física atual dos tanques</li>
-                <li>Estoque anterior = atual + vendas - compras</li>
-              </ul>
-            </Col>
-          </Row>
-          <hr />
-          <Row>
-            <Col md={12}>
-              <p className="text-muted mb-2"><strong>Legenda de Status (baseado em ocupação do tanque):</strong></p>
-              <ul className="mb-0 text-muted">
-                <li><strong className="text-danger">Crítico:</strong> Menos de 40% de ocupação - Compra urgente!</li>
-                <li><strong className="text-warning">Baixo:</strong> Entre 40% e 70% de ocupação - Programar compra</li>
-                <li><strong className="text-success">Adequado:</strong> Acima de 70% de ocupação - Estoque normal</li>
-              </ul>
-            </Col>
-          </Row>
-        </Card.Body>
-      </Card>
+      <div style={{ paddingBottom: '2rem' }} />
     </div>
   )
 }
