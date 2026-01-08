@@ -1,8 +1,49 @@
 import { useState, useEffect } from 'react'
-import { Row, Col, Card, Form, Table, Badge, Spinner, Alert, Button, Dropdown } from 'react-bootstrap'
+import { Row, Col, Card, Form, Table, Badge, Spinner, Alert, Button, Dropdown, Collapse } from 'react-bootstrap'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Scatter, ComposedChart } from 'recharts'
 import { fetchComprasDashboard, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
 import MockDataBadge, { MockDataCard } from '../MockDataBadge'
+
+// Collapsible Section Component
+const CollapsibleSection = ({ title, storageKey, defaultOpen = false, children, headerBg = 'primary' }) => {
+  const [isOpen, setIsOpen] = useState(() => {
+    const stored = localStorage.getItem(`compras_section_${storageKey}`)
+    if (stored !== null) return stored === 'true'
+    return defaultOpen
+  })
+
+  const toggle = () => {
+    const newState = !isOpen
+    setIsOpen(newState)
+    localStorage.setItem(`compras_section_${storageKey}`, String(newState))
+  }
+
+  return (
+    <Card className={`mb-4 border-${headerBg}`}>
+      <Card.Header
+        className={`bg-${headerBg} text-white d-flex justify-content-between align-items-center`}
+        style={{ cursor: 'pointer' }}
+        onClick={toggle}
+      >
+        <strong>{title}</strong>
+        <span style={{
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          fontSize: '1.2rem'
+        }}>
+          ▼
+        </span>
+      </Card.Header>
+      <Collapse in={isOpen}>
+        <div>
+          <Card.Body>
+            {children}
+          </Card.Body>
+        </div>
+      </Collapse>
+    </Card>
+  )
+}
 
 const Compras = () => {
   const [selectedProducts, setSelectedProducts] = useState([]) // Empty array = all products
@@ -513,71 +554,66 @@ const custoMedioData = (() => {
       </div>
 
       {/* Diagnostic Table - Purchase Performance per Product */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card>
-            <Card.Body>
-              <Card.Title>
-                Análise de Compras por Produto
-                <small className="text-success ms-2">✓ Dados Reais</small>
-              </Card.Title>
-              <p className="small text-muted mb-3">
-                Variação de Custo calculada como coeficiente de variação (desvio padrão / média × 100%)
-              </p>
-              <Table responsive hover>
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Volume Comprado (L)</th>
-                    <th>Custo Médio (R$/L)</th>
-                    <th>Custo Total</th>
-                    <th>Variação de Custo (%)</th>
-                    <th>Fornecedor Principal</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedComprasPorProduto.map(item => {
-                    const noPurchases = !item.hasPurchases
-                    return (
-                      <tr key={item.id} className={noPurchases ? 'text-muted' : ''}>
-                        <td><strong>{item.produto}</strong></td>
-                        <td>{noPurchases ? '-' : `${Math.round(item.volumeComprado).toLocaleString('pt-BR')} L`}</td>
-                        <td>{noPurchases ? '-' : `R$ ${item.custoMedio.toFixed(2)}/L`}</td>
-                        <td>
-                          {noPurchases ? '-' : new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL'
-                          }).format(item.custoTotal)}
-                        </td>
-                        <td>
-                          {noPurchases ? (
-                            <span className="text-muted">-</span>
-                          ) : (
-                            <span className={
-                              item.variacaoCusto > 10 ? 'text-danger' :
-                              item.variacaoCusto > 5 ? 'text-warning' :
-                              'text-success'
-                            }>
-                              {item.variacaoCusto != null ? `${item.variacaoCusto.toFixed(2)}%` : '0.00%'}
-                            </span>
-                          )}
-                        </td>
-                        <td>
-							<span className={item.fornecedor !== 'N/A' && item.fornecedor !== 'Unknown' ? 'text-success' : 'text-muted'}>
-							  {item.fornecedor}
-							</span>
-						</td>
-                        <td>{noPurchases ? <Badge bg="secondary">Sem Compras</Badge> : getComprasStatusBadge(item.variacaoCusto)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      <CollapsibleSection
+        title="Análise de Compras por Produto"
+        storageKey="analise"
+        defaultOpen={true}
+        headerBg="success"
+      >
+        <p className="small text-muted mb-3">
+          Variação de Custo calculada como coeficiente de variação (desvio padrão / média × 100%)
+        </p>
+        <Table responsive hover>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Volume Comprado (L)</th>
+              <th>Custo Médio (R$/L)</th>
+              <th>Custo Total</th>
+              <th>Variação de Custo (%)</th>
+              <th>Fornecedor Principal</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedComprasPorProduto.map(item => {
+              const noPurchases = !item.hasPurchases
+              return (
+                <tr key={item.id} className={noPurchases ? 'text-muted' : ''}>
+                  <td><strong>{item.produto}</strong></td>
+                  <td>{noPurchases ? '-' : `${Math.round(item.volumeComprado).toLocaleString('pt-BR')} L`}</td>
+                  <td>{noPurchases ? '-' : `R$ ${item.custoMedio.toFixed(2)}/L`}</td>
+                  <td>
+                    {noPurchases ? '-' : new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL'
+                    }).format(item.custoTotal)}
+                  </td>
+                  <td>
+                    {noPurchases ? (
+                      <span className="text-muted">-</span>
+                    ) : (
+                      <span className={
+                        item.variacaoCusto > 10 ? 'text-danger' :
+                        item.variacaoCusto > 5 ? 'text-warning' :
+                        'text-success'
+                      }>
+                        {item.variacaoCusto != null ? `${item.variacaoCusto.toFixed(2)}%` : '0.00%'}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <span className={item.fornecedor !== 'N/A' && item.fornecedor !== 'Unknown' ? 'text-success' : 'text-muted'}>
+                      {item.fornecedor}
+                    </span>
+                  </td>
+                  <td>{noPurchases ? <Badge bg="secondary">Sem Compras</Badge> : getComprasStatusBadge(item.variacaoCusto)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </Table>
+      </CollapsibleSection>
 
       {/* Metrics Cards - Real Data */}
       <Row className="mb-4">
@@ -620,68 +656,61 @@ const custoMedioData = (() => {
       </Row>
 
       {/* Charts - Real Data */}
-<Row className="mb-4">
-  <Col lg={12} className="mb-3">
-    <Card className="border-success">
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <div>
-            <Card.Title className="mb-0">
-              Evolutivo de Preço de Compra (R$/L)
-              <small className="text-success ms-2">✓ Dados Reais</small>
-            </Card.Title>
-            <p className="text-muted small mb-0">Custo por litro de cada produto e média geral ao longo do tempo</p>
-          </div>
-          <div className="d-flex flex-wrap gap-3">
-            <Form.Check
-              inline
-              type="checkbox"
-              id="chart-filter-gc"
-              label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
-              checked={selectedChartFuels.gasolinaComum}
-              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, gasolinaComum: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="chart-filter-ga"
-              label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
-              checked={selectedChartFuels.gasolinaAditivada}
-              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, gasolinaAditivada: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="chart-filter-et"
-              label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
-              checked={selectedChartFuels.etanol}
-              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, etanol: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="chart-filter-ds10"
-              label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
-              checked={selectedChartFuels.dieselS10}
-              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, dieselS10: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="chart-filter-ds500"
-              label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
-              checked={selectedChartFuels.dieselS500}
-              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, dieselS500: e.target.checked })}
-            />
-            <Form.Check
-              inline
-              type="checkbox"
-              id="chart-filter-media"
-              label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Média Geral</span>}
-              checked={selectedChartFuels.custoMedioGeral}
-              onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, custoMedioGeral: e.target.checked })}
-            />
-          </div>
+      <CollapsibleSection
+        title="Evolutivo de Preço de Compra (R$/L)"
+        storageKey="evolutivo"
+        defaultOpen={false}
+        headerBg="info"
+      >
+        <div className="d-flex flex-wrap gap-3 mb-3">
+          <Form.Check
+            inline
+            type="checkbox"
+            id="chart-filter-gc"
+            label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
+            checked={selectedChartFuels.gasolinaComum}
+            onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, gasolinaComum: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="chart-filter-ga"
+            label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
+            checked={selectedChartFuels.gasolinaAditivada}
+            onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, gasolinaAditivada: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="chart-filter-et"
+            label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
+            checked={selectedChartFuels.etanol}
+            onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, etanol: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="chart-filter-ds10"
+            label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
+            checked={selectedChartFuels.dieselS10}
+            onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, dieselS10: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="chart-filter-ds500"
+            label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
+            checked={selectedChartFuels.dieselS500}
+            onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, dieselS500: e.target.checked })}
+          />
+          <Form.Check
+            inline
+            type="checkbox"
+            id="chart-filter-media"
+            label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Média Geral</span>}
+            checked={selectedChartFuels.custoMedioGeral}
+            onChange={(e) => setSelectedChartFuels({ ...selectedChartFuels, custoMedioGeral: e.target.checked })}
+          />
         </div>
         <ResponsiveContainer width="100%" height={400}>
           <ComposedChart data={custoMedioData}>
@@ -690,14 +719,12 @@ const custoMedioData = (() => {
             <YAxis domain={['auto', 'auto']} />
             <Tooltip content={<CustomTooltip />} />
             <Legend />
-            {/* Step lines showing price over time */}
             {selectedChartFuels.gasolinaComum && <Line type="stepAfter" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.gasolinaAditivada && <Line type="stepAfter" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.etanol && <Line type="stepAfter" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.dieselS10 && <Line type="stepAfter" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.dieselS500 && <Line type="stepAfter" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (R$/L)" dot={false} connectNulls />}
             {selectedChartFuels.custoMedioGeral && <Line type="stepAfter" dataKey="custoMedioGeral" stroke="#000000" strokeWidth={3} name="Média Geral (R$/L)" dot={false} connectNulls />}
-            {/* Scatter dots showing actual purchase dates */}
             {selectedChartFuels.gasolinaComum && <Scatter dataKey="gcPurchase" fill="#0088FE" name="Compra GC" shape="circle" legendType="none" />}
             {selectedChartFuels.gasolinaAditivada && <Scatter dataKey="gaPurchase" fill="#00C49F" name="Compra GA" shape="circle" legendType="none" />}
             {selectedChartFuels.etanol && <Scatter dataKey="etPurchase" fill="#FFBB28" name="Compra ET" shape="circle" legendType="none" />}
@@ -705,10 +732,7 @@ const custoMedioData = (() => {
             {selectedChartFuels.dieselS500 && <Scatter dataKey="ds500Purchase" fill="#8884D8" name="Compra DS500" shape="circle" legendType="none" />}
           </ComposedChart>
         </ResponsiveContainer>
-      </Card.Body>
-    </Card>
-  </Col>
-</Row>
+      </CollapsibleSection>
 
       <Row className="mb-4">
   <Col lg={5} className="mb-3">
@@ -811,62 +835,63 @@ const custoMedioData = (() => {
 </Row>
 
       {/* Freight Costs Table - Mock Data */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <MockDataCard title="Custo do Frete por Nota Fiscal">
-            <p className="small text-muted mb-3">
-              Estes dados são simulados - não há campo de frete na tabela de compras.
-              Considere adicionar este campo para tracking detalhado de custos logísticos.
-            </p>
-            <Table responsive hover>
-              <thead>
-                <tr>
-                  <th>NF</th>
-                  <th>Data</th>
-                  <th>Fornecedor</th>
-                  <th>Volume (L)</th>
-                  <th>Frete Total</th>
-                  <th>Frete por Litro</th>
-                </tr>
-              </thead>
-              <tbody>
-                {freteData.map(item => (
-                  <tr key={item.nf}>
-                    <td><strong>{item.nf}</strong></td>
-                    <td>{item.data}</td>
-                    <td>{item.fornecedor}</td>
-                    <td>{item.volume.toLocaleString('pt-BR')} L</td>
-                    <td>
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(item.frete)}
-                    </td>
-                    <td>R$ {item.fretePorLitro.toFixed(2)}/L</td>
-                  </tr>
-                ))}
-                <tr className="table-secondary">
-                  <td colSpan="3"><strong>Total</strong></td>
-                  <td>
-                    <strong>
-                      {freteData.reduce((sum, f) => sum + f.volume, 0).toLocaleString('pt-BR')} L
-                    </strong>
-                  </td>
-                  <td>
-                    <strong>
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(freteData.reduce((sum, f) => sum + f.frete, 0))}
-                    </strong>
-                  </td>
-                  <td>-</td>
-                </tr>
-              </tbody>
-            </Table>
-          </MockDataCard>
-        </Col>
-      </Row>
+      <CollapsibleSection
+        title="Custo do Frete por Nota Fiscal (Dados Simulados)"
+        storageKey="frete"
+        defaultOpen={false}
+        headerBg="warning"
+      >
+        <p className="small text-muted mb-3">
+          Estes dados são simulados - não há campo de frete na tabela de compras.
+          Considere adicionar este campo para tracking detalhado de custos logísticos.
+        </p>
+        <Table responsive hover>
+          <thead>
+            <tr>
+              <th>NF</th>
+              <th>Data</th>
+              <th>Fornecedor</th>
+              <th>Volume (L)</th>
+              <th>Frete Total</th>
+              <th>Frete por Litro</th>
+            </tr>
+          </thead>
+          <tbody>
+            {freteData.map(item => (
+              <tr key={item.nf}>
+                <td><strong>{item.nf}</strong></td>
+                <td>{item.data}</td>
+                <td>{item.fornecedor}</td>
+                <td>{item.volume.toLocaleString('pt-BR')} L</td>
+                <td>
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                  }).format(item.frete)}
+                </td>
+                <td>R$ {item.fretePorLitro.toFixed(2)}/L</td>
+              </tr>
+            ))}
+            <tr className="table-secondary">
+              <td colSpan="3"><strong>Total</strong></td>
+              <td>
+                <strong>
+                  {freteData.reduce((sum, f) => sum + f.volume, 0).toLocaleString('pt-BR')} L
+                </strong>
+              </td>
+              <td>
+                <strong>
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL'
+                  }).format(freteData.reduce((sum, f) => sum + f.frete, 0))}
+                </strong>
+              </td>
+              <td>-</td>
+            </tr>
+          </tbody>
+        </Table>
+      </CollapsibleSection>
 
       <div style={{ paddingBottom: '2rem' }} />
     </div>

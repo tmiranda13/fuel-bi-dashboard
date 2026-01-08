@@ -1,7 +1,48 @@
 import { useState, useEffect } from 'react'
-import { Row, Col, Card, Table, Badge, Form, Spinner, Alert, Button } from 'react-bootstrap'
+import { Row, Col, Card, Table, Badge, Form, Spinner, Alert, Button, Collapse } from 'react-bootstrap'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchEstoqueDashboard, fetchEstoqueEvolution, fetchVarianceData, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
+
+// Collapsible Section Component
+const CollapsibleSection = ({ title, storageKey, defaultOpen = false, children, headerBg = 'primary' }) => {
+  const [isOpen, setIsOpen] = useState(() => {
+    const stored = localStorage.getItem(`estoque_section_${storageKey}`)
+    if (stored !== null) return stored === 'true'
+    return defaultOpen
+  })
+
+  const toggle = () => {
+    const newState = !isOpen
+    setIsOpen(newState)
+    localStorage.setItem(`estoque_section_${storageKey}`, String(newState))
+  }
+
+  return (
+    <Card className={`mb-4 border-${headerBg}`}>
+      <Card.Header
+        className={`bg-${headerBg} text-white d-flex justify-content-between align-items-center`}
+        style={{ cursor: 'pointer' }}
+        onClick={toggle}
+      >
+        <strong>{title}</strong>
+        <span style={{
+          transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          fontSize: '1.2rem'
+        }}>
+          ▼
+        </span>
+      </Card.Header>
+      <Collapse in={isOpen}>
+        <div>
+          <Card.Body>
+            {children}
+          </Card.Body>
+        </div>
+      </Collapse>
+    </Card>
+  )
+}
 
 const Estoque = () => {
   const [startDate, setStartDate] = useState(() => {
@@ -327,334 +368,315 @@ const Estoque = () => {
       </div>
 
       {/* 1. Status de Estoque por Produto */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card className="border-success">
-            <Card.Body>
-              <Card.Title>Status de Estoque por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-              <p className="small text-muted mb-3">
-                Custo calculado com base no custo médio ponderado das compras.
-              </p>
-              <Table responsive hover>
-                <thead>
-  <tr>
-    <th>Produto</th>
-    <th>Capacidade (L)</th>
-    <th>Estoque Atual (L)</th>
-    <th style={{ width: '12%' }}>Ocupação</th>
-    <th>Dias Autonomia</th>
-    <th>Custo Médio (R$/L)</th>
-    <th>Custo Estoque</th>
-    <th>Status</th>
-  </tr>
-</thead>
-                <tbody>
-  {estoqueData.map(item => (
-    <tr key={item.id} className={item.status === 'critico' ? 'table-danger' : item.status === 'baixo' ? 'table-warning' : ''}>
-      <td><strong>{item.produto}</strong></td>
-      <td><strong className="text-success">{Math.round(item.capacidadeTanque).toLocaleString('pt-BR')}</strong></td>
-      <td><strong className="text-success">{Math.round(item.estoqueAtual).toLocaleString('pt-BR')}</strong></td>
-      <td>
-        <div className="d-flex align-items-center">
-          <div className="progress" style={{ height: '13px', width: '33px' }}>
-            <div
-              className={`progress-bar ${item.percentualOcupacao < 40 ? 'bg-danger' : item.percentualOcupacao < 70 ? 'bg-warning' : 'bg-success'}`}
-              role="progressbar"
-              style={{ width: `${Math.min(item.percentualOcupacao, 100)}%` }}
+      <CollapsibleSection
+        title="Status de Estoque por Produto"
+        storageKey="status"
+        defaultOpen={true}
+        headerBg="success"
+      >
+        <p className="small text-muted mb-3">
+          Custo calculado com base no custo médio ponderado das compras.
+        </p>
+        <Table responsive hover>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Capacidade (L)</th>
+              <th>Estoque Atual (L)</th>
+              <th style={{ width: '12%' }}>Ocupação</th>
+              <th>Dias Autonomia</th>
+              <th>Custo Médio (R$/L)</th>
+              <th>Custo Estoque</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {estoqueData.map(item => (
+              <tr key={item.id} className={item.status === 'critico' ? 'table-danger' : item.status === 'baixo' ? 'table-warning' : ''}>
+                <td><strong>{item.produto}</strong></td>
+                <td><strong className="text-success">{Math.round(item.capacidadeTanque).toLocaleString('pt-BR')}</strong></td>
+                <td><strong className="text-success">{Math.round(item.estoqueAtual).toLocaleString('pt-BR')}</strong></td>
+                <td>
+                  <div className="d-flex align-items-center">
+                    <div className="progress" style={{ height: '13px', width: '33px' }}>
+                      <div
+                        className={`progress-bar ${item.percentualOcupacao < 40 ? 'bg-danger' : item.percentualOcupacao < 70 ? 'bg-warning' : 'bg-success'}`}
+                        role="progressbar"
+                        style={{ width: `${Math.min(item.percentualOcupacao, 100)}%` }}
+                      />
+                    </div>
+                    <span className="ms-1 fw-bold" style={{ fontSize: '0.85em' }}>{item.percentualOcupacao.toFixed(0)}%</span>
+                  </div>
+                </td>
+                <td><strong className="text-success">{item.diasAutonomia.toFixed(1)} dias</strong></td>
+                <td><strong className="text-success">R$ {item.custoMedio.toFixed(2)}/L</strong></td>
+                <td><strong className="text-success">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.custoEstoque)}</strong></td>
+                <td>{getStatusBadge(item.status)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </CollapsibleSection>
+
+      {/* 2. Evolução de Estoque */}
+      <CollapsibleSection
+        title="Evolução de Estoque"
+        storageKey="evolucao"
+        defaultOpen={false}
+        headerBg="info"
+      >
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <p className="small text-muted mb-0">
+            Estoque diário calculado a partir das compras (entradas) e vendas (saídas).
+            O estoque atual é baseado na medição física dos tanques.
+          </p>
+          <div className="d-flex flex-wrap gap-3">
+            <Form.Check
+              inline
+              type="checkbox"
+              id="stock-filter-gc"
+              label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
+              checked={selectedStockFuels.GC}
+              onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, GC: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="stock-filter-ga"
+              label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
+              checked={selectedStockFuels.GA}
+              onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, GA: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="stock-filter-et"
+              label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
+              checked={selectedStockFuels.ET}
+              onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, ET: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="stock-filter-ds10"
+              label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
+              checked={selectedStockFuels.DS10}
+              onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, DS10: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="stock-filter-ds500"
+              label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
+              checked={selectedStockFuels.DS500}
+              onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, DS500: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="stock-filter-total"
+              label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
+              checked={selectedStockFuels.total}
+              onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, total: e.target.checked })}
             />
           </div>
-          <span className="ms-1 fw-bold" style={{ fontSize: '0.85em' }}>{item.percentualOcupacao.toFixed(0)}%</span>
         </div>
-      </td>
-      <td><strong className="text-success">{item.diasAutonomia.toFixed(1)} dias</strong></td>
-      <td><strong className="text-success">R$ {item.custoMedio.toFixed(2)}/L</strong></td>
-      <td><strong className="text-success">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.custoEstoque)}</strong></td>
-      <td>{getStatusBadge(item.status)}</td>
-    </tr>
-  ))}
-</tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* 2. Evolução de Estoque (MOVED UP) */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card className="border-success">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                  <Card.Title className="mb-0">Evolução de Estoque <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-                  <p className="small text-muted mb-0">
-                    Estoque diário calculado a partir das compras (entradas) e vendas (saídas).
-                    O estoque atual é baseado na medição física dos tanques.
-                  </p>
-                </div>
-                <div className="d-flex flex-wrap gap-3">
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="stock-filter-gc"
-                    label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
-                    checked={selectedStockFuels.GC}
-                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, GC: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="stock-filter-ga"
-                    label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
-                    checked={selectedStockFuels.GA}
-                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, GA: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="stock-filter-et"
-                    label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
-                    checked={selectedStockFuels.ET}
-                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, ET: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="stock-filter-ds10"
-                    label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
-                    checked={selectedStockFuels.DS10}
-                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, DS10: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="stock-filter-ds500"
-                    label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
-                    checked={selectedStockFuels.DS500}
-                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, DS500: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="stock-filter-total"
-                    label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
-                    checked={selectedStockFuels.total}
-                    onChange={(e) => setSelectedStockFuels({ ...selectedStockFuels, total: e.target.checked })}
-                  />
-                </div>
-              </div>
-              {evolutionLoading ? (
-                <div className="text-center py-5">
-                  <Spinner animation="border" size="sm" />
-                  <span className="ms-2">Carregando evolução...</span>
-                </div>
-              ) : stockEvolutionData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={stockEvolutionData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="dia" />
-                    <YAxis />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    {selectedStockFuels.GC && <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />}
-                    {selectedStockFuels.GA && <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />}
-                    {selectedStockFuels.ET && <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />}
-                    {selectedStockFuels.DS10 && <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />}
-                    {selectedStockFuels.DS500 && <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />}
-                    {selectedStockFuels.total && <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />}
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <Alert variant="info">Nenhum dado de evolução disponível para o período selecionado.</Alert>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+        {evolutionLoading ? (
+          <div className="text-center py-5">
+            <Spinner animation="border" size="sm" />
+            <span className="ms-2">Carregando evolução...</span>
+          </div>
+        ) : stockEvolutionData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={stockEvolutionData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="dia" />
+              <YAxis />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend />
+              {selectedStockFuels.GC && <Line type="monotone" dataKey="gasolinaComum" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum (L)" />}
+              {selectedStockFuels.GA && <Line type="monotone" dataKey="gasolinaAditivada" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada (L)" />}
+              {selectedStockFuels.ET && <Line type="monotone" dataKey="etanol" stroke="#FFBB28" strokeWidth={2} name="Etanol (L)" />}
+              {selectedStockFuels.DS10 && <Line type="monotone" dataKey="dieselS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10 (L)" />}
+              {selectedStockFuels.DS500 && <Line type="monotone" dataKey="dieselS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500 (L)" />}
+              {selectedStockFuels.total && <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />}
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <Alert variant="info">Nenhum dado de evolução disponível para o período selecionado.</Alert>
+        )}
+      </CollapsibleSection>
 
       {/* 3. Variação de Estoque (Sobra/Falta) */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card className="border-success">
-            <Card.Body>
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <div>
-                  <Card.Title className="mb-0">
-                    Variação de Estoque (Sobra/Falta)
-                    <small className="text-success ms-2">✓ Dados Reais</small>
-                  </Card.Title>
-                  <p className="text-muted small mb-0">Diferença entre estoque calculado e medição física dos tanques</p>
-                </div>
-                <div className="d-flex flex-wrap gap-3">
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="variance-filter-gc"
-                    label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
-                    checked={selectedVarianceFuels.GC}
-                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, GC: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="variance-filter-ga"
-                    label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
-                    checked={selectedVarianceFuels.GA}
-                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, GA: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="variance-filter-et"
-                    label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
-                    checked={selectedVarianceFuels.ET}
-                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, ET: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="variance-filter-ds10"
-                    label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
-                    checked={selectedVarianceFuels.DS10}
-                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, DS10: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="variance-filter-ds500"
-                    label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
-                    checked={selectedVarianceFuels.DS500}
-                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, DS500: e.target.checked })}
-                  />
-                  <Form.Check
-                    inline
-                    type="checkbox"
-                    id="variance-filter-total"
-                    label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
-                    checked={selectedVarianceFuels.total}
-                    onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, total: e.target.checked })}
-                  />
-                </div>
-              </div>
-              
-              {varianceChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={varianceChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="dia" />
-                    <YAxis domain={['auto', 'auto']} />
-                    <Tooltip content={<VarianceTooltip />} />
-                    <Legend />
-                    <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
-                    {selectedVarianceFuels.GC && <Bar dataKey="GC" fill="#0088FE" name="Gasolina Comum (L)" />}
-                    {selectedVarianceFuels.GA && <Bar dataKey="GA" fill="#00C49F" name="Gasolina Aditivada (L)" />}
-                    {selectedVarianceFuels.ET && <Bar dataKey="ET" fill="#FFBB28" name="Etanol (L)" />}
-                    {selectedVarianceFuels.DS10 && <Bar dataKey="DS10" fill="#FF8042" name="Diesel S10 (L)" />}
-                    {selectedVarianceFuels.DS500 && <Bar dataKey="DS500" fill="#8884D8" name="Diesel S500 (L)" />}
-                    {selectedVarianceFuels.total && <Bar dataKey="total" fill="#333333" name="Total (L)" />}
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <Alert variant="info">Nenhum dado de variação disponível para o período selecionado.</Alert>
-              )}
-              
-              {/* Variance Summary Legend */}
-              <div className="mt-3 d-flex justify-content-center gap-4">
-                <span><span style={{ color: '#28a745', fontWeight: 'bold' }}>● Positivo (Sobra)</span> = Medição física &gt; Estoque calculado</span>
-                <span><span style={{ color: '#dc3545', fontWeight: 'bold' }}>● Negativo (Falta)</span> = Medição física &lt; Estoque calculado</span>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      <CollapsibleSection
+        title="Variação de Estoque (Sobra/Falta)"
+        storageKey="variacao"
+        defaultOpen={false}
+        headerBg="warning"
+      >
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <p className="text-muted small mb-0">Diferença entre estoque calculado e medição física dos tanques</p>
+          <div className="d-flex flex-wrap gap-3">
+            <Form.Check
+              inline
+              type="checkbox"
+              id="variance-filter-gc"
+              label={<span style={{ color: '#0088FE' }}>Gasolina Comum</span>}
+              checked={selectedVarianceFuels.GC}
+              onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, GC: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="variance-filter-ga"
+              label={<span style={{ color: '#00C49F' }}>Gasolina Aditivada</span>}
+              checked={selectedVarianceFuels.GA}
+              onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, GA: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="variance-filter-et"
+              label={<span style={{ color: '#FFBB28' }}>Etanol</span>}
+              checked={selectedVarianceFuels.ET}
+              onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, ET: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="variance-filter-ds10"
+              label={<span style={{ color: '#FF8042' }}>Diesel S10</span>}
+              checked={selectedVarianceFuels.DS10}
+              onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, DS10: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="variance-filter-ds500"
+              label={<span style={{ color: '#8884D8' }}>Diesel S500</span>}
+              checked={selectedVarianceFuels.DS500}
+              onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, DS500: e.target.checked })}
+            />
+            <Form.Check
+              inline
+              type="checkbox"
+              id="variance-filter-total"
+              label={<span style={{ color: '#000000', fontWeight: 'bold' }}>Total</span>}
+              checked={selectedVarianceFuels.total}
+              onChange={(e) => setSelectedVarianceFuels({ ...selectedVarianceFuels, total: e.target.checked })}
+            />
+          </div>
+        </div>
+
+        {varianceChartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={varianceChartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="dia" />
+              <YAxis domain={['auto', 'auto']} />
+              <Tooltip content={<VarianceTooltip />} />
+              <Legend />
+              <ReferenceLine y={0} stroke="#666" strokeWidth={2} />
+              {selectedVarianceFuels.GC && <Bar dataKey="GC" fill="#0088FE" name="Gasolina Comum (L)" />}
+              {selectedVarianceFuels.GA && <Bar dataKey="GA" fill="#00C49F" name="Gasolina Aditivada (L)" />}
+              {selectedVarianceFuels.ET && <Bar dataKey="ET" fill="#FFBB28" name="Etanol (L)" />}
+              {selectedVarianceFuels.DS10 && <Bar dataKey="DS10" fill="#FF8042" name="Diesel S10 (L)" />}
+              {selectedVarianceFuels.DS500 && <Bar dataKey="DS500" fill="#8884D8" name="Diesel S500 (L)" />}
+              {selectedVarianceFuels.total && <Bar dataKey="total" fill="#333333" name="Total (L)" />}
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <Alert variant="info">Nenhum dado de variação disponível para o período selecionado.</Alert>
+        )}
+
+        {/* Variance Summary Legend */}
+        <div className="mt-3 d-flex justify-content-center gap-4">
+          <span><span style={{ color: '#28a745', fontWeight: 'bold' }}>● Positivo (Sobra)</span> = Medição física &gt; Estoque calculado</span>
+          <span><span style={{ color: '#dc3545', fontWeight: 'bold' }}>● Negativo (Falta)</span> = Medição física &lt; Estoque calculado</span>
+        </div>
+      </CollapsibleSection>
 
       {/* 4. Resumo de Variação por Produto */}
       {varianceSummary.length > 0 && (
-        <Row className="mb-4">
-          <Col lg={12}>
-            <Card className="border-success">
-              <Card.Body>
-                <Card.Title>Resumo de Variação por Produto <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-                <p className="small text-muted mb-3">
-                  Total de sobras e faltas no período selecionado
-                </p>
-                <Table responsive hover>
-                  <thead>
-                    <tr>
-                      <th>Produto</th>
-                      <th>Total Sobra (L)</th>
-                      <th>Total Falta (L)</th>
-                      <th>Saldo (L)</th>
-                      <th>Valor (R$)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {varianceSummary.map((item, index) => {
-                      const productName = normalizeProductName(item.product_name)
-                      const cost = costByProduct[productName] || 0
-                      const financialValue = item.net * cost
-                      return (
-                        <tr key={index}>
-                          <td><strong>{productName}</strong></td>
-                          <td className="text-success">+{item.total_gain.toFixed(1)}</td>
-                          <td className="text-danger">{item.total_loss.toFixed(1)}</td>
-                          <td className={item.net >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
-                            {item.net >= 0 ? '+' : ''}{item.net.toFixed(1)}
-                          </td>
-                          <td className={financialValue >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
-                            {financialValue >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(financialValue)}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                    <tr className="table-secondary">
-                      <td><strong>TOTAL</strong></td>
-                      <td className="text-success fw-bold">+{varianceTotals.totalGain.toFixed(1)}</td>
-                      <td className="text-danger fw-bold">{varianceTotals.totalLoss.toFixed(1)}</td>
-                      <td className={varianceTotals.totalNet >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
-                        {varianceTotals.totalNet >= 0 ? '+' : ''}{varianceTotals.totalNet.toFixed(1)}
-                      </td>
-                      <td className={totalFinancialVariance >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
-                        {totalFinancialVariance >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalFinancialVariance)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </Table>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+        <CollapsibleSection
+          title="Resumo de Variação por Produto"
+          storageKey="resumo"
+          defaultOpen={false}
+          headerBg="secondary"
+        >
+          <p className="small text-muted mb-3">
+            Total de sobras e faltas no período selecionado
+          </p>
+          <Table responsive hover>
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th>Total Sobra (L)</th>
+                <th>Total Falta (L)</th>
+                <th>Saldo (L)</th>
+                <th>Valor (R$)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {varianceSummary.map((item, index) => {
+                const productName = normalizeProductName(item.product_name)
+                const cost = costByProduct[productName] || 0
+                const financialValue = item.net * cost
+                return (
+                  <tr key={index}>
+                    <td><strong>{productName}</strong></td>
+                    <td className="text-success">+{item.total_gain.toFixed(1)}</td>
+                    <td className="text-danger">{item.total_loss.toFixed(1)}</td>
+                    <td className={item.net >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                      {item.net >= 0 ? '+' : ''}{item.net.toFixed(1)}
+                    </td>
+                    <td className={financialValue >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                      {financialValue >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(financialValue)}
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr className="table-secondary">
+                <td><strong>TOTAL</strong></td>
+                <td className="text-success fw-bold">+{varianceTotals.totalGain.toFixed(1)}</td>
+                <td className="text-danger fw-bold">{varianceTotals.totalLoss.toFixed(1)}</td>
+                <td className={varianceTotals.totalNet >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                  {varianceTotals.totalNet >= 0 ? '+' : ''}{varianceTotals.totalNet.toFixed(1)}
+                </td>
+                <td className={totalFinancialVariance >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                  {totalFinancialVariance >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalFinancialVariance)}
+                </td>
+              </tr>
+            </tbody>
+          </Table>
+        </CollapsibleSection>
       )}
 
       {/* 5. Alertas de Estoque */}
-      <Row className="mb-4">
-        <Col lg={12}>
-          <Card border={estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length > 0 ? 'danger' : 'success'}>
-            <Card.Header className={estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length > 0 ? 'bg-danger text-white' : 'bg-success text-white'}>
-              <strong>Alertas de Estoque</strong> <small className="ms-2">✓ Dados Reais</small>
-            </Card.Header>
-            <Card.Body>
-              {estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length === 0 ? (
-                <p className="mb-0 text-success">
-                  <strong>✓ Não há alertas de estoque no momento.</strong> Todos os tanques estão com ocupação adequada (acima de 70%).
-                </p>
-              ) : (
-                <ul className="mb-0">
-                  {estoqueData
-                    .filter(item => item.status === 'critico' || item.status === 'baixo')
-                    .map(item => (
-                      <li key={item.id} className={item.status === 'critico' ? 'text-danger fw-bold' : 'text-warning fw-bold'}>
-                        <strong>{item.produto}:</strong> {item.percentualOcupacao.toFixed(0)}% de ocupação
-                        {item.status === 'critico' && ' - URGENTE: Compra necessária imediatamente!'}
-                        {item.status === 'baixo' && ' - Programar compra nos próximos dias.'}
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      <CollapsibleSection
+        title="Alertas de Estoque"
+        storageKey="alertas"
+        defaultOpen={false}
+        headerBg={estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length > 0 ? 'danger' : 'success'}
+      >
+        {estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length === 0 ? (
+          <p className="mb-0 text-success">
+            <strong>✓ Não há alertas de estoque no momento.</strong> Todos os tanques estão com ocupação adequada (acima de 70%).
+          </p>
+        ) : (
+          <ul className="mb-0">
+            {estoqueData
+              .filter(item => item.status === 'critico' || item.status === 'baixo')
+              .map(item => (
+                <li key={item.id} className={item.status === 'critico' ? 'text-danger fw-bold' : 'text-warning fw-bold'}>
+                  <strong>{item.produto}:</strong> {item.percentualOcupacao.toFixed(0)}% de ocupação
+                  {item.status === 'critico' && ' - URGENTE: Compra necessária imediatamente!'}
+                  {item.status === 'baixo' && ' - Programar compra nos próximos dias.'}
+                </li>
+              ))}
+          </ul>
+        )}
+      </CollapsibleSection>
 
       <div style={{ paddingBottom: '2rem' }} />
     </div>
