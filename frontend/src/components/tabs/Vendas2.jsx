@@ -89,15 +89,33 @@ const Vendas2 = () => {
       setLoading(true)
       setError(null)
 
-      // Fetch from combined_sales table
-      const { data, error: fetchError } = await supabase
-        .from('combined_sales')
-        .select('*')
-        .gte('sale_date', startDate)
-        .lte('sale_date', endDate)
-        .eq('company_id', 2)
+      // Fetch from combined_sales table - use pagination to get all records
+      // Supabase default limit is 1000, so we need to fetch in batches
+      let allData = []
+      let offset = 0
+      const batchSize = 5000
 
-      if (fetchError) throw fetchError
+      while (true) {
+        const { data: batch, error: fetchError } = await supabase
+          .from('combined_sales')
+          .select('*')
+          .gte('sale_date', startDate)
+          .lte('sale_date', endDate)
+          .eq('company_id', 2)
+          .range(offset, offset + batchSize - 1)
+
+        if (fetchError) throw fetchError
+
+        if (!batch || batch.length === 0) break
+
+        allData = [...allData, ...batch]
+        offset += batchSize
+
+        // If we got less than batchSize, we've reached the end
+        if (batch.length < batchSize) break
+      }
+
+      const data = allData
 
       if (!data || data.length === 0) {
         setSalesData({ total_volume: 0, total_revenue: 0, transactions: 0 })
