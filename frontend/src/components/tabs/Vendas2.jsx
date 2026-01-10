@@ -92,30 +92,51 @@ const Vendas2 = () => {
       // Fetch from combined_sales table - use pagination to get all records
       // Supabase default limit is 1000, so we need to fetch in batches
       let allData = []
-      let offset = 0
-      const batchSize = 5000
+      const batchSize = 1000
+      let lastId = null
 
+      // First, get total count
+      const { count } = await supabase
+        .from('combined_sales')
+        .select('*', { count: 'exact', head: true })
+        .gte('sale_date', startDate)
+        .lte('sale_date', endDate)
+        .eq('company_id', 2)
+
+      console.log(`Total records to fetch: ${count}`)
+
+      // Fetch in batches using cursor-based pagination
       while (true) {
-        const { data: batch, error: fetchError } = await supabase
+        let query = supabase
           .from('combined_sales')
           .select('*')
           .gte('sale_date', startDate)
           .lte('sale_date', endDate)
           .eq('company_id', 2)
-          .range(offset, offset + batchSize - 1)
+          .order('id', { ascending: true })
+          .limit(batchSize)
+
+        if (lastId) {
+          query = query.gt('id', lastId)
+        }
+
+        const { data: batch, error: fetchError } = await query
 
         if (fetchError) throw fetchError
 
         if (!batch || batch.length === 0) break
 
         allData = [...allData, ...batch]
-        offset += batchSize
+        lastId = batch[batch.length - 1].id
+
+        console.log(`Fetched ${allData.length} of ${count} records...`)
 
         // If we got less than batchSize, we've reached the end
         if (batch.length < batchSize) break
       }
 
       const data = allData
+      console.log(`Total fetched: ${data.length} records`)
 
       if (!data || data.length === 0) {
         setSalesData({ total_volume: 0, total_revenue: 0, transactions: 0 })
