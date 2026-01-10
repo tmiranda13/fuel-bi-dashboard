@@ -5,6 +5,7 @@ import { supabase } from './services/supabase'
 
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import { PinnedWidgetsProvider } from './contexts/PinnedWidgetsContext'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './assets/index.css'
@@ -205,26 +206,28 @@ function App() {
   return (
     <HashRouter>
       <AuthProvider>
-        <Routes>
-          <Route 
-            path="/login" 
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            } 
-          />
-          <Route
-            path="/dashboard/*"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+        <PinnedWidgetsProvider>
+          <Routes>
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/dashboard/*"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </PinnedWidgetsProvider>
       </AuthProvider>
     </HashRouter>
   )

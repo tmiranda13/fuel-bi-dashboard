@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Container, Nav, Navbar, Tab, Tabs } from 'react-bootstrap';
 import { useAuth } from '../App';
+import Home from '../components/tabs/Home';
 import Vendas from '../components/tabs/Vendas';
+import Vendas2 from '../components/tabs/Vendas2';
 import Compras from '../components/tabs/Compras';
 import Estoque from '../components/tabs/Estoque';
 import Metas from '../components/tabs/Metas';
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('vendas');
+  const [activeTab, setActiveTab] = useState('home');
   const { profile, companyName, userName, logout, isManager, isSuperAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -59,8 +61,14 @@ export default function Dashboard() {
           onSelect={(k) => setActiveTab(k)}
           className="mb-4"
         >
+          <Tab eventKey="home" title="Home">
+            <Home onNavigateToTab={setActiveTab} />
+          </Tab>
           <Tab eventKey="vendas" title="Vendas">
             <Vendas />
+          </Tab>
+          <Tab eventKey="vendas2" title="Vendas 2.0">
+            <Vendas2 />
           </Tab>
           <Tab eventKey="compras" title="Compras">
             <Compras />
