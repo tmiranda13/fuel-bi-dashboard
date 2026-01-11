@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS combined_sales (
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    -- Prevent duplicate imports
-    UNIQUE(company_id, sale_date, pump_number, product_code, volume, value, cupom_number)
+    -- Prevent duplicate imports (sale_time helps distinguish same-value transactions)
+    UNIQUE(company_id, sale_date, pump_number, product_code, volume, value, cupom_number, sale_time)
 );
 
 -- Indexes for common queries

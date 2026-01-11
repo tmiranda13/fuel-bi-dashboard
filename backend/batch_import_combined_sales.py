@@ -60,7 +60,7 @@ def import_combined_sales(combined_data, company_id=2, batch_size=100):
     duplicates = 0
 
     for txn in combined_data:
-        # Create a unique key for deduplication
+        # Create a unique key for deduplication (includes sale_time to distinguish same-value transactions)
         key = (
             company_id,
             str(txn.get('sale_date')),
@@ -68,7 +68,8 @@ def import_combined_sales(combined_data, company_id=2, batch_size=100):
             txn.get('product_code'),
             round(float(txn.get('volume', 0)), 3),
             round(float(txn.get('value', 0)), 2),
-            txn.get('cupom_number')
+            txn.get('cupom_number'),
+            format_time(txn.get('sale_time'))
         )
 
         if key in seen:
@@ -97,26 +98,43 @@ def import_combined_sales(combined_data, company_id=2, batch_size=100):
         print(f"  Skipped {duplicates} duplicate records")
     print(f"  Unique records to insert: {len(records)}")
 
-    # Insert in batches using regular insert (ignore conflicts)
+    # Insert in batches using upsert with ignore duplicates
     inserted = 0
+    skipped_db = 0
     errors = 0
 
     for i in range(0, len(records), batch_size):
         batch = records[i:i + batch_size]
         try:
-            result = supabase.table('combined_sales').insert(batch).execute()
+            # Use upsert with ignore to skip duplicates instead of failing
+            result = supabase.table('combined_sales').upsert(
+                batch,
+                on_conflict='company_id,sale_date,pump_number,product_code,volume,value,cupom_number,sale_time',
+                ignore_duplicates=True
+            ).execute()
             inserted += len(batch)
-            if (i // batch_size + 1) % 20 == 0:  # Print every 20 batches
+            if (i // batch_size + 1) % 10 == 0:  # Print every 10 batches
                 print(f"  Progress: {inserted:,} records inserted...")
         except Exception as e:
             error_msg = str(e)
             if 'duplicate key' in error_msg.lower() or '23505' in error_msg:
-                # Skip duplicates silently (already in DB)
-                pass
+                # Batch failed - try one by one
+                for record in batch:
+                    try:
+                        supabase.table('combined_sales').upsert(
+                            record,
+                            on_conflict='company_id,sale_date,pump_number,product_code,volume,value,cupom_number,sale_time',
+                            ignore_duplicates=True
+                        ).execute()
+                        inserted += 1
+                    except:
+                        skipped_db += 1
             else:
                 print(f"  ERROR in batch {i//batch_size + 1}: {e}")
                 errors += len(batch)
 
+    if skipped_db > 0:
+        print(f"  Skipped {skipped_db} DB duplicates")
     print(f"[OK] Imported {inserted} records, {errors} errors")
     return inserted, errors
 
