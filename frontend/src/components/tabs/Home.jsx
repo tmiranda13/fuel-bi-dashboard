@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Row, Col, Card, Badge, Button, Spinner, Alert, ProgressBar, Modal, Form } from 'react-bootstrap'
+import { Row, Col, Card, Badge, Button, Spinner, Alert, ProgressBar, Modal, Form, Table } from 'react-bootstrap'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import { usePinnedWidgets, AVAILABLE_WIDGETS } from '../../contexts/PinnedWidgetsContext'
 import { fetchVendasDashboard, fetchComprasDashboard, fetchEstoqueDashboard, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
+import { supabase } from '../../services/supabase'
 
 const Home = ({ onNavigateToTab }) => {
   const { pinnedWidgets, unpinWidget, availableWidgets, pinWidget, resetToDefault } = usePinnedWidgets()
@@ -13,6 +14,16 @@ const Home = ({ onNavigateToTab }) => {
   const [currentMonthData, setCurrentMonthData] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [error, setError] = useState(null)
+
+  // Insights data
+  const [insightsData, setInsightsData] = useState({
+    yesterday: null,
+    lastWeekSameDay: null,
+    thisWeek: null,
+    lastWeek: null,
+    employeeGAMix: [],
+    alerts: []
+  })
 
   // Fetch data for widgets
   useEffect(() => {
@@ -60,6 +71,9 @@ const Home = ({ onNavigateToTab }) => {
         const estoque = await fetchEstoqueDashboard(estoqueStart, todayStr)
         setEstoqueData(estoque)
 
+        // Fetch insights data (pass estoque for alerts)
+        await fetchInsightsData(estoque)
+
       } catch (err) {
         console.error('Error fetching home data:', err)
         setError(err.message)
@@ -70,6 +84,143 @@ const Home = ({ onNavigateToTab }) => {
 
     fetchData()
   }, [])
+
+  // Fetch insights data
+  const fetchInsightsData = async (estoqueDataParam) => {
+    try {
+      const now = new Date()
+
+      // Calculate dates
+      const yesterday = new Date(now)
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+      const lastWeekSameDay = new Date(now)
+      lastWeekSameDay.setDate(lastWeekSameDay.getDate() - 8) // Same day last week (yesterday - 7)
+      const lastWeekSameDayStr = lastWeekSameDay.toISOString().split('T')[0]
+
+      // This week (Monday to yesterday)
+      const thisWeekStart = new Date(now)
+      const dayOfWeek = thisWeekStart.getDay()
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+      thisWeekStart.setDate(thisWeekStart.getDate() - daysToMonday - 1) // Monday of this week
+      const thisWeekStartStr = thisWeekStart.toISOString().split('T')[0]
+
+      // Last week (Monday to Sunday)
+      const lastWeekStart = new Date(thisWeekStart)
+      lastWeekStart.setDate(lastWeekStart.getDate() - 7)
+      const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0]
+      const lastWeekEnd = new Date(lastWeekStart)
+      lastWeekEnd.setDate(lastWeekEnd.getDate() + 6)
+      const lastWeekEndStr = lastWeekEnd.toISOString().split('T')[0]
+
+      // Fetch yesterday's data
+      const yesterdayData = await fetchVendasDashboard(yesterdayStr, yesterdayStr)
+
+      // Fetch same day last week
+      const lastWeekSameDayData = await fetchVendasDashboard(lastWeekSameDayStr, lastWeekSameDayStr)
+
+      // Fetch this week data
+      const thisWeekData = await fetchVendasDashboard(thisWeekStartStr, yesterdayStr)
+
+      // Fetch last week data
+      const lastWeekData = await fetchVendasDashboard(lastWeekStartStr, lastWeekEndStr)
+
+      // Fetch employee GA mix from combined_sales (last 7 days)
+      const sevenDaysAgo = new Date(now)
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0]
+
+      const { data: employeeSales } = await supabase
+        .from('combined_sales')
+        .select('employee, product_code, volume')
+        .gte('sale_date', sevenDaysAgoStr)
+        .lte('sale_date', yesterdayStr)
+        .eq('company_id', 2)
+        .in('product_code', ['GA', 'GC'])
+
+      // Aggregate employee GA mix
+      const empMix = {}
+      employeeSales?.forEach(row => {
+        const emp = row.employee || 'Não Identificado'
+        if (!empMix[emp]) {
+          empMix[emp] = { name: emp, volumeGA: 0, volumeGC: 0 }
+        }
+        const vol = parseFloat(row.volume || 0)
+        if (row.product_code === 'GA') empMix[emp].volumeGA += vol
+        if (row.product_code === 'GC') empMix[emp].volumeGC += vol
+      })
+
+      const employeeGAMix = Object.values(empMix)
+        .map(e => ({
+          ...e,
+          totalGasoline: e.volumeGA + e.volumeGC,
+          mixGA: (e.volumeGA + e.volumeGC) > 0 ? (e.volumeGA / (e.volumeGA + e.volumeGC)) * 100 : 0
+        }))
+        .filter(e => e.totalGasoline > 500) // Only employees with significant gasoline sales
+        .sort((a, b) => b.mixGA - a.mixGA)
+
+      // Build alerts array
+      const alerts = []
+
+      // Low autonomy alerts (from estoque)
+      const lowAutonomy = estoqueDataParam?.inventory?.filter(item => parseFloat(item.days_autonomy || 0) < 3) || []
+      lowAutonomy.forEach(item => {
+        alerts.push({
+          type: 'stock',
+          severity: 'danger',
+          message: `${normalizeProductName(item.product_name)}: ${parseFloat(item.days_autonomy).toFixed(1)} dias de autonomia`
+        })
+      })
+
+      // Underperforming bicos (fetch from combined_sales)
+      const { data: bicoSales } = await supabase
+        .from('combined_sales')
+        .select('pump_number, product_code, volume')
+        .gte('sale_date', sevenDaysAgoStr)
+        .lte('sale_date', yesterdayStr)
+        .eq('company_id', 2)
+
+      // Group by product and calculate averages
+      const bicoByProduct = {}
+      bicoSales?.forEach(row => {
+        const pump = row.pump_number
+        const product = row.product_code
+        if (!bicoByProduct[product]) bicoByProduct[product] = {}
+        if (!bicoByProduct[product][pump]) bicoByProduct[product][pump] = 0
+        bicoByProduct[product][pump] += parseFloat(row.volume || 0)
+      })
+
+      // Find underperforming bicos (>25% below average for their product)
+      Object.entries(bicoByProduct).forEach(([product, pumps]) => {
+        const volumes = Object.values(pumps)
+        if (volumes.length < 2) return
+        const avg = volumes.reduce((a, b) => a + b, 0) / volumes.length
+        Object.entries(pumps).forEach(([pump, vol]) => {
+          const diff = ((vol - avg) / avg) * 100
+          if (diff < -25) {
+            alerts.push({
+              type: 'bico',
+              severity: 'warning',
+              message: `Bico ${pump} (${product}): ${diff.toFixed(0)}% abaixo da média`
+            })
+          }
+        })
+      })
+
+      setInsightsData({
+        yesterday: yesterdayData,
+        lastWeekSameDay: lastWeekSameDayData,
+        thisWeek: thisWeekData,
+        lastWeek: lastWeekData,
+        employeeGAMix,
+        alerts: alerts.slice(0, 5) // Limit to 5 alerts
+      })
+
+    } catch (err) {
+      console.error('Error fetching insights:', err)
+    }
+  }
 
   // Product colors
   const productColors = {
@@ -438,6 +589,181 @@ const Home = ({ onNavigateToTab }) => {
           </Spinner>
           <p className="mt-3 text-muted">Carregando widgets...</p>
         </div>
+      )}
+
+      {/* Insights Section */}
+      {!loading && (
+        <>
+          <Card className="mb-4 border-primary">
+            <Card.Header className="bg-primary text-white">
+              <strong>Insights do Dia</strong>
+            </Card.Header>
+            <Card.Body>
+              <Row>
+                {/* Yesterday's Performance */}
+                <Col lg={3} md={6} className="mb-3">
+                  <Card className="h-100 border-0 bg-light">
+                    <Card.Body className="p-3">
+                      <h6 className="text-muted mb-2">Ontem</h6>
+                      {insightsData.yesterday ? (
+                        <>
+                          <div className="fs-4 fw-bold">
+                            {Math.round(insightsData.yesterday.total_volume || 0).toLocaleString('pt-BR')} L
+                          </div>
+                          {insightsData.lastWeekSameDay && (() => {
+                            const yesterdayVol = insightsData.yesterday.total_volume || 0
+                            const lastWeekVol = insightsData.lastWeekSameDay.total_volume || 0
+                            const diff = lastWeekVol > 0 ? ((yesterdayVol - lastWeekVol) / lastWeekVol) * 100 : 0
+                            const isUp = diff >= 0
+                            return (
+                              <div className={`small ${isUp ? 'text-success' : 'text-danger'}`}>
+                                {isUp ? '↑' : '↓'} {Math.abs(diff).toFixed(1)}% vs. semana passada
+                              </div>
+                            )
+                          })()}
+                          <small className="text-muted">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(insightsData.yesterday.total_revenue || 0)}
+                          </small>
+                        </>
+                      ) : (
+                        <span className="text-muted">Sem dados</span>
+                      )}
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                {/* MTD Progress */}
+                <Col lg={3} md={6} className="mb-3">
+                  <Card className="h-100 border-0 bg-light">
+                    <Card.Body className="p-3">
+                      <h6 className="text-muted mb-2">Progresso MTD</h6>
+                      {currentMonthData && vendasData ? (
+                        <>
+                          <div className="d-flex justify-content-between align-items-end mb-1">
+                            <span className="fs-5 fw-bold">
+                              {Math.round(vendasData.total_volume || 0).toLocaleString('pt-BR')} L
+                            </span>
+                            <Badge bg="info">{currentMonthData.daysElapsed}/{currentMonthData.daysInMonth} dias</Badge>
+                          </div>
+                          <ProgressBar
+                            now={(currentMonthData.daysElapsed / currentMonthData.daysInMonth) * 100}
+                            variant="info"
+                            style={{ height: '8px' }}
+                            className="mb-1"
+                          />
+                          <small className="text-muted">
+                            Projeção: {currentMonthData.projected.toLocaleString('pt-BR')} L
+                          </small>
+                        </>
+                      ) : (
+                        <span className="text-muted">Carregando...</span>
+                      )}
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                {/* Weekly Comparison */}
+                <Col lg={3} md={6} className="mb-3">
+                  <Card className="h-100 border-0 bg-light">
+                    <Card.Body className="p-3">
+                      <h6 className="text-muted mb-2">Esta Semana vs. Anterior</h6>
+                      {insightsData.thisWeek && insightsData.lastWeek ? (
+                        <>
+                          {(() => {
+                            const thisWeekVol = insightsData.thisWeek.total_volume || 0
+                            const lastWeekVol = insightsData.lastWeek.total_volume || 0
+                            const diff = lastWeekVol > 0 ? ((thisWeekVol - lastWeekVol) / lastWeekVol) * 100 : 0
+                            const isUp = diff >= 0
+                            return (
+                              <>
+                                <div className="d-flex align-items-center">
+                                  <span className={`fs-3 fw-bold ${isUp ? 'text-success' : 'text-danger'}`}>
+                                    {isUp ? '↑' : '↓'} {Math.abs(diff).toFixed(1)}%
+                                  </span>
+                                </div>
+                                <small className="text-muted d-block">
+                                  {Math.round(thisWeekVol).toLocaleString('pt-BR')} L vs. {Math.round(lastWeekVol).toLocaleString('pt-BR')} L
+                                </small>
+                              </>
+                            )
+                          })()}
+                        </>
+                      ) : (
+                        <span className="text-muted">Sem dados</span>
+                      )}
+                    </Card.Body>
+                  </Card>
+                </Col>
+
+                {/* Mix GA Status */}
+                <Col lg={3} md={6} className="mb-3">
+                  <Card className="h-100 border-0 bg-light">
+                    <Card.Body className="p-3">
+                      <h6 className="text-muted mb-2">Mix GA (7 dias)</h6>
+                      {insightsData.employeeGAMix.length > 0 ? (
+                        <>
+                          {(() => {
+                            const totalGA = insightsData.employeeGAMix.reduce((sum, e) => sum + e.volumeGA, 0)
+                            const totalGC = insightsData.employeeGAMix.reduce((sum, e) => sum + e.volumeGC, 0)
+                            const overallMix = (totalGA + totalGC) > 0 ? (totalGA / (totalGA + totalGC)) * 100 : 0
+                            const bestEmployee = insightsData.employeeGAMix[0]
+                            return (
+                              <>
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                  <span className="fs-4 fw-bold text-success">{overallMix.toFixed(1)}%</span>
+                                  <Badge bg={overallMix >= 20 ? 'success' : 'warning'}>
+                                    {overallMix >= 20 ? 'Bom' : 'Melhorar'}
+                                  </Badge>
+                                </div>
+                                {bestEmployee && (
+                                  <div className="small">
+                                    <span className="text-muted">Destaque: </span>
+                                    <strong>{bestEmployee.name}</strong>
+                                    <Badge bg="success" className="ms-1">{bestEmployee.mixGA.toFixed(1)}%</Badge>
+                                  </div>
+                                )}
+                              </>
+                            )
+                          })()}
+                        </>
+                      ) : (
+                        <span className="text-muted">Sem dados</span>
+                      )}
+                    </Card.Body>
+                  </Card>
+                </Col>
+              </Row>
+
+              {/* Alerts Row */}
+              {insightsData.alerts.length > 0 && (
+                <div className="mt-2 pt-3 border-top">
+                  <h6 className="text-muted mb-2">Alertas</h6>
+                  <Row>
+                    {insightsData.alerts.map((alert, idx) => (
+                      <Col key={idx} md={6} lg={4} className="mb-2">
+                        <Alert variant={alert.severity} className="py-2 px-3 mb-0 d-flex align-items-center">
+                          <span className="me-2">
+                            {alert.type === 'stock' ? '⛽' : alert.type === 'bico' ? '🔧' : '⚠️'}
+                          </span>
+                          <small>{alert.message}</small>
+                        </Alert>
+                      </Col>
+                    ))}
+                  </Row>
+                </div>
+              )}
+
+              {insightsData.alerts.length === 0 && (
+                <div className="mt-2 pt-3 border-top">
+                  <Alert variant="success" className="py-2 px-3 mb-0">
+                    <span className="me-2">✓</span>
+                    <small>Nenhum alerta - tudo funcionando normalmente!</small>
+                  </Alert>
+                </div>
+              )}
+            </Card.Body>
+          </Card>
+        </>
       )}
 
       {/* Widgets Grid */}
