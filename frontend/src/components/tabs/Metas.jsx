@@ -142,19 +142,19 @@ const Metas = () => {
         // Get the most recent purchase for this product (for cost)
         const { data: latestPurchase } = await supabase
           .from('purchases')
-          .select('unit_price, purchase_date')
+          .select('cost_price, receipt_date')
           .eq('company_id', 2)
-          .eq('product_code', code)
-          .not('unit_price', 'is', null)
-          .order('purchase_date', { ascending: false })
+          .eq('canonical_product_code', code)
+          .not('cost_price', 'is', null)
+          .order('receipt_date', { ascending: false })
           .limit(1)
           .single()
 
         prices[code] = {
           avg_price: parseFloat(latestSale?.unit_price || 0),
-          avg_cost: parseFloat(latestPurchase?.unit_price || 0),
+          avg_cost: parseFloat(latestPurchase?.cost_price || 0),
           price_date: latestSale?.sale_date || null,
-          cost_date: latestPurchase?.purchase_date || null
+          cost_date: latestPurchase?.receipt_date || null
         }
       }
 
