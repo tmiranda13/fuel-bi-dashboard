@@ -255,9 +255,9 @@ const Estoque = () => {
     )
   }
 
-  const getStatusFromOccupation = (percentOccupation) => {
-    if (percentOccupation >= 70) return 'adequado'
-    if (percentOccupation >= 40) return 'baixo'
+  const getStatusFromAutonomy = (daysAutonomy) => {
+    if (daysAutonomy >= 4) return 'adequado'
+    if (daysAutonomy >= 3) return 'baixo'
     return 'critico'
   }
 
@@ -274,10 +274,11 @@ const Estoque = () => {
       percentualOcupacao,
       entradas: parseFloat(item.period_entries || 0),
       saidas: parseFloat(item.period_exits || 0),
+      vmd: parseFloat(item.vmd || 0),
       diasAutonomia: parseFloat(item.days_autonomy),
       custoEstoque: parseFloat(item.stock_cost || 0),
       custoMedio: parseFloat(item.avg_cost || 0),
-      status: getStatusFromOccupation(percentualOcupacao)
+      status: getStatusFromAutonomy(parseFloat(item.days_autonomy))
     }
   })
 
@@ -287,11 +288,16 @@ const Estoque = () => {
   const varianceSummary = varianceData?.summary || []
   const varianceTotals = varianceData?.totals || { totalGain: 0, totalLoss: 0, totalNet: 0 }
 
-  // Create cost lookup for variance financial calculation
+  // Create cost and VMD lookups for variance calculations
   const costByProduct = {}
+  const vmdByProduct = {}
   estoqueData.forEach(item => {
     costByProduct[item.produto] = item.custoMedio
+    vmdByProduct[item.produto] = item.vmd
   })
+
+  // Calculate total VMD for percentage calculation
+  const totalVmd = estoqueData.reduce((sum, item) => sum + (item.vmd || 0), 0)
 
   // Calculate total financial variance
   const totalFinancialVariance = varianceSummary.reduce((sum, item) => {
@@ -614,6 +620,7 @@ const Estoque = () => {
                 <th>Total Sobra (L)</th>
                 <th>Total Falta (L)</th>
                 <th>Saldo (L)</th>
+                <th>% do VMD</th>
                 <th>Valor (R$)</th>
               </tr>
             </thead>
@@ -621,7 +628,9 @@ const Estoque = () => {
               {varianceSummary.map((item, index) => {
                 const productName = normalizeProductName(item.product_name)
                 const cost = costByProduct[productName] || 0
+                const vmd = vmdByProduct[productName] || 0
                 const financialValue = item.net * cost
+                const vmdPercent = vmd > 0 ? (item.net / vmd) * 100 : 0
                 return (
                   <tr key={index}>
                     <td><strong>{productName}</strong></td>
@@ -630,23 +639,34 @@ const Estoque = () => {
                     <td className={item.net >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
                       {item.net >= 0 ? '+' : ''}{item.net.toFixed(1)}
                     </td>
+                    <td className={vmdPercent >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                      {vmdPercent >= 0 ? '+' : ''}{vmdPercent.toFixed(2)}%
+                    </td>
                     <td className={financialValue >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
                       {financialValue >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(financialValue)}
                     </td>
                   </tr>
                 )
               })}
-              <tr className="table-secondary">
-                <td><strong>TOTAL</strong></td>
-                <td className="text-success fw-bold">+{varianceTotals.totalGain.toFixed(1)}</td>
-                <td className="text-danger fw-bold">{varianceTotals.totalLoss.toFixed(1)}</td>
-                <td className={varianceTotals.totalNet >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
-                  {varianceTotals.totalNet >= 0 ? '+' : ''}{varianceTotals.totalNet.toFixed(1)}
-                </td>
-                <td className={totalFinancialVariance >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
-                  {totalFinancialVariance >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalFinancialVariance)}
-                </td>
-              </tr>
+              {(() => {
+                const totalVmdPercent = totalVmd > 0 ? (varianceTotals.totalNet / totalVmd) * 100 : 0
+                return (
+                  <tr className="table-secondary">
+                    <td><strong>TOTAL</strong></td>
+                    <td className="text-success fw-bold">+{varianceTotals.totalGain.toFixed(1)}</td>
+                    <td className="text-danger fw-bold">{varianceTotals.totalLoss.toFixed(1)}</td>
+                    <td className={varianceTotals.totalNet >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                      {varianceTotals.totalNet >= 0 ? '+' : ''}{varianceTotals.totalNet.toFixed(1)}
+                    </td>
+                    <td className={totalVmdPercent >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                      {totalVmdPercent >= 0 ? '+' : ''}{totalVmdPercent.toFixed(2)}%
+                    </td>
+                    <td className={totalFinancialVariance >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                      {totalFinancialVariance >= 0 ? '+' : ''}{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalFinancialVariance)}
+                    </td>
+                  </tr>
+                )
+              })()}
             </tbody>
           </Table>
         </CollapsibleSection>
@@ -661,7 +681,7 @@ const Estoque = () => {
       >
         {estoqueData.filter(item => item.status === 'critico' || item.status === 'baixo').length === 0 ? (
           <p className="mb-0 text-success">
-            <strong>✓ Não há alertas de estoque no momento.</strong> Todos os tanques estão com ocupação adequada (acima de 70%).
+            <strong>✓ Não há alertas de estoque no momento.</strong> Todos os produtos estão com autonomia adequada (4+ dias).
           </p>
         ) : (
           <ul className="mb-0">
@@ -669,7 +689,7 @@ const Estoque = () => {
               .filter(item => item.status === 'critico' || item.status === 'baixo')
               .map(item => (
                 <li key={item.id} className={item.status === 'critico' ? 'text-danger fw-bold' : 'text-warning fw-bold'}>
-                  <strong>{item.produto}:</strong> {item.percentualOcupacao.toFixed(0)}% de ocupação
+                  <strong>{item.produto}:</strong> {item.diasAutonomia.toFixed(1)} dias de autonomia
                   {item.status === 'critico' && ' - URGENTE: Compra necessária imediatamente!'}
                   {item.status === 'baixo' && ' - Programar compra nos próximos dias.'}
                 </li>

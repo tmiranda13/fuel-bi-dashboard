@@ -131,8 +131,8 @@ export const AVAILABLE_WIDGETS = {
   },
   'estoque_alertas': {
     id: 'estoque_alertas',
-    title: 'Alertas de Estoque',
-    description: 'Produtos com estoque baixo',
+    title: 'Alertas de Autonomia',
+    description: 'Produtos com autonomia baixa (<4 dias)',
     sourceTab: 'estoque',
     type: 'alerts',
     size: 'medium'

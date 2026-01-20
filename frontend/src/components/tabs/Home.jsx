@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { Row, Col, Card, Badge, Button, Spinner, Alert, ProgressBar, Modal, Form } from 'react-bootstrap'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import { usePinnedWidgets, AVAILABLE_WIDGETS } from '../../contexts/PinnedWidgetsContext'
-import { fetchVendasDashboard, fetchComprasDashboard, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
+import { fetchVendasDashboard, fetchComprasDashboard, fetchEstoqueDashboard, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
 
 const Home = ({ onNavigateToTab }) => {
   const { pinnedWidgets, unpinWidget, availableWidgets, pinWidget, resetToDefault } = usePinnedWidgets()
   const [loading, setLoading] = useState(true)
   const [vendasData, setVendasData] = useState(null)
   const [comprasData, setComprasData] = useState(null)
+  const [estoqueData, setEstoqueData] = useState(null)
   const [currentMonthData, setCurrentMonthData] = useState(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [error, setError] = useState(null)
@@ -51,6 +52,13 @@ const Home = ({ onNavigateToTab }) => {
         // Fetch compras data
         const compras = await fetchComprasDashboard(monthStart, todayStr)
         setComprasData(compras)
+
+        // Fetch estoque data (last 30 days for VMD calculation)
+        const thirtyDaysAgo = new Date()
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+        const estoqueStart = thirtyDaysAgo.toISOString().split('T')[0]
+        const estoque = await fetchEstoqueDashboard(estoqueStart, todayStr)
+        setEstoqueData(estoque)
 
       } catch (err) {
         console.error('Error fetching home data:', err)
@@ -318,6 +326,57 @@ const Home = ({ onNavigateToTab }) => {
                   {loading ? '...' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(comprasData?.total_cost || 0)}
                 </Card.Text>
                 <Badge bg="warning" text="dark" className="mt-1">Compras</Badge>
+              </Card.Body>
+            </Card>
+          </Col>
+        )
+
+      case 'estoque_alertas':
+        const autonomyData = estoqueData?.inventory?.map(item => ({
+          produto: normalizeProductName(item.product_name),
+          diasAutonomia: parseFloat(item.days_autonomy || 0),
+          estoqueAtual: parseFloat(item.current_stock || 0),
+          status: item.days_autonomy >= 4 ? 'adequado' : item.days_autonomy >= 3 ? 'baixo' : 'critico'
+        })) || []
+        const alertItems = autonomyData.filter(item => item.status === 'critico' || item.status === 'baixo')
+        const hasAlerts = alertItems.length > 0
+
+        return (
+          <Col md={colSize} sm={6} className="mb-3" key={widgetId}>
+            <Card className={`h-100 border-${hasAlerts ? 'danger' : 'success'} widget-card`} onClick={handleClick} style={{ cursor: 'pointer' }}>
+              <Card.Body className="position-relative">
+                <Button variant="link" className="position-absolute top-0 end-0 p-1 text-muted" onClick={handleUnpin} title="Remover">
+                  <small>✕</small>
+                </Button>
+                <Card.Title className="text-muted fs-6">Alertas de Autonomia</Card.Title>
+                {loading ? (
+                  <Spinner animation="border" size="sm" />
+                ) : hasAlerts ? (
+                  <div className="mt-2">
+                    {alertItems.map((item, idx) => (
+                      <div key={idx} className={`mb-2 p-2 rounded ${item.status === 'critico' ? 'bg-danger bg-opacity-10' : 'bg-warning bg-opacity-10'}`}>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <strong className={item.status === 'critico' ? 'text-danger' : 'text-warning'}>
+                            {item.produto}
+                          </strong>
+                          <Badge bg={item.status === 'critico' ? 'danger' : 'warning'} text={item.status === 'baixo' ? 'dark' : 'white'}>
+                            {item.diasAutonomia.toFixed(1)} dias
+                          </Badge>
+                        </div>
+                        <small className="text-muted">
+                          {item.status === 'critico' ? 'Compra urgente!' : 'Programar compra'}
+                        </small>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-3">
+                    <span className="text-success fs-1">✓</span>
+                    <p className="text-success mb-0 mt-2"><strong>Tudo OK!</strong></p>
+                    <small className="text-muted">Todos os produtos com 4+ dias de autonomia</small>
+                  </div>
+                )}
+                <Badge bg={hasAlerts ? 'danger' : 'success'} className="mt-2">Estoque</Badge>
               </Card.Body>
             </Card>
           </Col>
