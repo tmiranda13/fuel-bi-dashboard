@@ -483,7 +483,7 @@ const Vendas2 = () => {
 
       {/* Pump Performance */}
       <CollapsibleSection
-        title="Desempenho por Bomba"
+        title="Desempenho por Bico"
         storageKey="pump"
         defaultOpen={false}
         headerBg="warning"
@@ -491,7 +491,7 @@ const Vendas2 = () => {
         <Table responsive hover size="sm">
           <thead>
             <tr>
-              <th>Bomba</th>
+              <th>Bico</th>
               <th>Produto</th>
               <th>Volume (L)</th>
               <th>Faturamento</th>
@@ -515,7 +515,7 @@ const Vendas2 = () => {
           </tbody>
         </Table>
         {pumpData.length > 15 && (
-          <small className="text-muted">Mostrando top 15 de {pumpData.length} combinações bomba/produto</small>
+          <small className="text-muted">Mostrando top 15 de {pumpData.length} combinações bico/produto</small>
         )}
       </CollapsibleSection>
 
