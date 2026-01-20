@@ -106,12 +106,13 @@ const Home = ({ onNavigateToTab }) => {
       thisWeekStart.setDate(thisWeekStart.getDate() - daysToMonday) // Monday of this week
       const thisWeekStartStr = thisWeekStart.toISOString().split('T')[0]
 
-      // Last week (Monday to Sunday)
+      // Last week (same days as this week for fair comparison)
+      // Monday of last week to same day of week as yesterday
       const lastWeekStart = new Date(thisWeekStart)
       lastWeekStart.setDate(lastWeekStart.getDate() - 7) // Monday of last week
       const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0]
-      const lastWeekEnd = new Date(lastWeekStart)
-      lastWeekEnd.setDate(lastWeekEnd.getDate() + 6) // Sunday of last week
+      const lastWeekEnd = new Date(yesterday)
+      lastWeekEnd.setDate(lastWeekEnd.getDate() - 7) // Same day last week as yesterday
       const lastWeekEndStr = lastWeekEnd.toISOString().split('T')[0]
 
       // Fetch yesterday's data
