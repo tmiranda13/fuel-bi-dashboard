@@ -314,7 +314,7 @@ const Vendas2 = () => {
       <div className="mb-4">
         <Row className="align-items-center">
           <Col md={4}>
-            <h2>Vendas 2.0 <Badge bg="warning" text="dark">Beta</Badge></h2>
+            <h2>Abastecimentos</h2>
             <small className="text-muted">Dados: Cupons + Vendas por Bico</small>
           </Col>
           <Col md={8}>

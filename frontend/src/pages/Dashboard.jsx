@@ -67,7 +67,7 @@ export default function Dashboard() {
           <Tab eventKey="vendas" title="Vendas">
             <Vendas />
           </Tab>
-          <Tab eventKey="vendas2" title="Vendas 2.0">
+          <Tab eventKey="vendas2" title="Abastecimentos">
             <Vendas2 />
           </Tab>
           <Tab eventKey="compras" title="Compras">
