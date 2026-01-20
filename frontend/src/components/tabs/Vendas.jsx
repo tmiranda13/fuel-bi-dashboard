@@ -3,6 +3,7 @@ import { Row, Col, Card, Form, Table, Badge, Spinner, Alert, Button, ProgressBar
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { fetchVendasDashboard, fetchKpis, sortProductsByStandardOrder, normalizeProductName } from '../../services/dashboardApi'
 import { pjClientsService } from '../../services/dataService'
+import { supabase } from '../../services/supabase'
 import MockDataBadge, { MockDataCard } from '../MockDataBadge'
 
 // Collapsible Section Component
@@ -85,6 +86,9 @@ const Vendas = () => {
   const [pjClients, setPjClients] = useState([])
   const [pjBreakdown, setPjBreakdown] = useState(null)
   const [pjLoading, setPjLoading] = useState(false)
+
+  // Payment methods state
+  const [paymentData, setPaymentData] = useState([])
   
   // Fetch current month projection (independent of date pickers)
   const fetchCurrentMonthProjection = async () => {
@@ -156,6 +160,58 @@ const Vendas = () => {
       // Don't fail the whole page if PJ data fails
       setPjClients([])
       setPjBreakdown(null)
+    }
+
+    // Fetch payment methods data from combined_sales
+    try {
+      const { data: salesData, error: salesError } = await supabase
+        .from('combined_sales')
+        .select('payment_method, payment_breakdown, value')
+        .gte('sale_date', startDate)
+        .lte('sale_date', endDate)
+        .eq('company_id', 2)
+
+      if (salesError) throw salesError
+
+      // Aggregate by payment method (supports split payments via payment_breakdown)
+      const byPayment = {}
+      salesData?.forEach(row => {
+        // Check if payment_breakdown exists (new format with split payment support)
+        let payments = []
+        if (row.payment_breakdown) {
+          try {
+            const breakdown = typeof row.payment_breakdown === 'string'
+              ? JSON.parse(row.payment_breakdown)
+              : row.payment_breakdown
+            if (Array.isArray(breakdown) && breakdown.length > 0) {
+              payments = breakdown
+            }
+          } catch (e) {
+            console.warn('Failed to parse payment_breakdown:', e)
+          }
+        }
+
+        // Fall back to single payment_method if no breakdown
+        if (payments.length === 0) {
+          const payment = row.payment_method || 'Outros'
+          payments = [{ method: payment, amount: parseFloat(row.value || 0) }]
+        }
+
+        // Add each payment portion to its respective method
+        payments.forEach(p => {
+          const method = p.method || 'Outros'
+          const amount = parseFloat(p.amount || 0)
+          if (!byPayment[method]) {
+            byPayment[method] = { method: method, revenue: 0, transactions: 0 }
+          }
+          byPayment[method].revenue += amount
+          byPayment[method].transactions += 1
+        })
+      })
+      setPaymentData(Object.values(byPayment).sort((a, b) => b.revenue - a.revenue))
+    } catch (payErr) {
+      console.error('Error fetching payment data:', payErr)
+      setPaymentData([])
     }
   } catch (err) {
     setError(err.message)
@@ -911,36 +967,46 @@ const Vendas = () => {
   <Col lg={4} className="mb-3">
     <Card className="h-100 border-success">
       <Card.Body>
-        <Card.Title>Mix de Gasolina <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
-        {getMixTarget('gasolina') && (
-          <Badge bg={parseFloat(mixGasolinaAditivada) >= getMixTarget('gasolina') ? 'success' : 'warning'} className="mb-2">
-            Meta: {getMixTarget('gasolina')}% aditivada
-          </Badge>
+        <Card.Title>Formas de Pagamento <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
+        {paymentData.length > 0 ? (
+          <>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={paymentData.slice(0, 5).map(p => ({
+                    name: p.method,
+                    value: p.revenue
+                  }))}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={(entry) => {
+                    const total = paymentData.reduce((sum, p) => sum + p.revenue, 0)
+                    return `${((entry.value / total) * 100).toFixed(0)}%`
+                  }}
+                  outerRadius={70}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {paymentData.slice(0, 5).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={['#00C49F', '#0088FE', '#FFBB28', '#FF8042', '#8884D8'][index % 5]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="text-center mt-2">
+              <small className="text-muted">
+                Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(paymentData.reduce((sum, p) => sum + p.revenue, 0))}
+              </small>
+            </div>
+          </>
+        ) : (
+          <div className="text-center text-muted py-4">
+            Sem dados de pagamento
+          </div>
         )}
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie
-              data={[
-                { name: 'Comum', value: gasolinaComumTotal, color: '#0088FE' },
-                { name: 'Aditivada', value: gasolinaAditivadaTotal, color: '#00C49F' }
-              ]}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={(entry) => `${entry.name}: ${((entry.value / gasolinaTotal) * 100).toFixed(1)}%`}
-              outerRadius={70}
-              fill="#8884d8"
-              dataKey="value"
-            >
-              <Cell fill="#0088FE" />
-              <Cell fill="#00C49F" />
-            </Pie>
-            <Tooltip formatter={(value) => `${Math.round(value).toLocaleString('pt-BR')} L`} />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="text-center mt-2">
-          <small className="text-muted">Total: {Math.round(gasolinaTotal).toLocaleString('pt-BR')} L</small>
-        </div>
       </Card.Body>
     </Card>
   </Col>
