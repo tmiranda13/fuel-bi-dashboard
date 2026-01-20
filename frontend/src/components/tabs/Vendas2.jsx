@@ -412,67 +412,40 @@ const Vendas2 = () => {
         defaultOpen={true}
         headerBg="success"
       >
-        <Row>
-          <Col lg={8}>
-            <Table responsive hover>
-              <thead>
-                <tr>
-                  <th>Funcionário</th>
-                  <th>Volume (L)</th>
-                  <th>Faturamento</th>
-                  <th>Ticket Médio</th>
-                  <th>Mix GA</th>
-                  <th>% do Total</th>
+        <Table responsive hover>
+          <thead>
+            <tr>
+              <th>Funcionário</th>
+              <th>Volume (L)</th>
+              <th>Faturamento</th>
+              <th>Ticket Médio</th>
+              <th>Mix GA</th>
+              <th>% do Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {employeeData.map((emp, index) => {
+              const totalGasoline = emp.volumeGA + emp.volumeGC
+              const mixGA = totalGasoline > 0 ? (emp.volumeGA / totalGasoline) * 100 : 0
+              return (
+                <tr key={index}>
+                  <td><strong>{emp.name}</strong></td>
+                  <td>{Math.round(emp.volume).toLocaleString('pt-BR')} L</td>
+                  <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(emp.revenue)}</td>
+                  <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(emp.revenue / emp.transactions)}</td>
+                  <td>
+                    <Badge bg={mixGA >= 30 ? 'success' : mixGA >= 20 ? 'warning' : 'secondary'}>
+                      {mixGA.toFixed(1)}%
+                    </Badge>
+                  </td>
+                  <td>
+                    <Badge bg="primary">{((emp.revenue / totalRevenue) * 100).toFixed(1)}%</Badge>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {employeeData.map((emp, index) => {
-                  const totalGasoline = emp.volumeGA + emp.volumeGC
-                  const mixGA = totalGasoline > 0 ? (emp.volumeGA / totalGasoline) * 100 : 0
-                  return (
-                    <tr key={index}>
-                      <td><strong>{emp.name}</strong></td>
-                      <td>{Math.round(emp.volume).toLocaleString('pt-BR')} L</td>
-                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(emp.revenue)}</td>
-                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(emp.revenue / emp.transactions)}</td>
-                      <td>
-                        <Badge bg={mixGA >= 30 ? 'success' : mixGA >= 20 ? 'warning' : 'secondary'}>
-                          {mixGA.toFixed(1)}%
-                        </Badge>
-                      </td>
-                      <td>
-                        <Badge bg="primary">{((emp.revenue / totalRevenue) * 100).toFixed(1)}%</Badge>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </Table>
-          </Col>
-          <Col lg={4}>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={employeeData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry) => `${((entry.revenue / totalRevenue) * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="revenue"
-                  nameKey="name"
-                >
-                  {employeeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'][index % 5]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </Col>
-        </Row>
+              )
+            })}
+          </tbody>
+        </Table>
       </CollapsibleSection>
 
       {/* Payment Methods */}
