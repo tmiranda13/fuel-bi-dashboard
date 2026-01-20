@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, memo } from 'react'
 import { Row, Col, Card, Badge, Form, Button, Table, Alert, Spinner } from 'react-bootstrap'
-import { sortProductsByStandardOrder, PRODUCT_ORDER, PRODUCT_NAMES } from '../../services/dashboardApi'
+import { sortProductsByStandardOrder, PRODUCT_ORDER, PRODUCT_NAMES, fetchVendasDashboard } from '../../services/dashboardApi'
 import { kpisService } from '../../services/dataService'
 import { useAuth } from '../../App'
 
@@ -72,6 +72,7 @@ const Metas = () => {
   const { companyId } = useAuth()
   const [kpis, setKpis] = useState([])
   const [products, setProducts] = useState([])
+  const [priceData, setPriceData] = useState({}) // { productCode: { avg_price, avg_cost } }
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -97,9 +98,7 @@ const Metas = () => {
     { value: 'sales_volume', label: 'Volume Mensal', unit: 'liters', description: 'Meta de volume de vendas em litros' },
     { value: 'margin', label: 'Margem Bruta', unit: 'percent', description: 'Meta de margem bruta em %' },
     { value: 'cost', label: 'Mix de Aditivados', unit: 'percent', description: 'Meta de % de vendas de aditivados' },
-    { value: 'revenue', label: 'Lucro Bruto', unit: 'reais', description: 'Meta de lucro bruto em R$' },
-    { value: 'avg_price', label: 'Preço Médio Venda', unit: 'reais_per_liter', description: 'Preço médio de venda em R$/L' },
-    { value: 'avg_cost', label: 'Preço Médio Custo', unit: 'reais_per_liter', description: 'Preço médio de custo em R$/L' }
+    { value: 'revenue', label: 'Lucro Bruto', unit: 'reais', description: 'Lucro bruto projetado (calculado automaticamente)' }
   ]
 
   // Local state for editing values
@@ -115,16 +114,35 @@ const Metas = () => {
     yearOptions.push(y)
   }
 
-  // Fetch products - use standard product list
-  const fetchProducts = async () => {
+  // Fetch products and current prices from sales data
+  const fetchProductsAndPrices = async () => {
     try {
       const productList = PRODUCT_ORDER.map(code => ({
         product_code: code,
         product_name: PRODUCT_NAMES[code]
       }))
       setProducts(productList)
+
+      // Fetch current month's sales data to get avg prices
+      const now = new Date()
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      const today = now.toISOString().split('T')[0]
+
+      const vendasData = await fetchVendasDashboard(monthStart, today)
+
+      // Build price lookup by product code
+      const prices = {}
+      if (vendasData?.products) {
+        vendasData.products.forEach(p => {
+          prices[p.product_code] = {
+            avg_price: parseFloat(p.avg_price || 0),
+            avg_cost: parseFloat(p.avg_cost || 0)
+          }
+        })
+      }
+      setPriceData(prices)
     } catch (err) {
-      console.error('Error fetching products:', err)
+      console.error('Error fetching products and prices:', err)
     }
   }
 
@@ -161,7 +179,7 @@ const Metas = () => {
 
   // Initial load
   useEffect(() => {
-    fetchProducts()
+    fetchProductsAndPrices()
   }, [])
 
   // Reload KPIs when month/year changes
@@ -258,12 +276,6 @@ try {
         } else if (key.startsWith('cost_')) {
           kpiType = 'cost'
           productCode = key.replace('cost_', '')
-        } else if (key.startsWith('avg_price_')) {
-          kpiType = 'avg_price'
-          productCode = key.replace('avg_price_', '')
-        } else if (key.startsWith('avg_cost_')) {
-          kpiType = 'avg_cost'
-          productCode = key.replace('avg_cost_', '')
         } else if (key.startsWith('revenue_')) {
           // Skip revenue - it's calculated automatically
           continue
@@ -443,12 +455,12 @@ try {
   // Calculate gross profit for a product: Volume × (Preço Venda - Preço Custo)
   const calculateGrossProfit = (productCode) => {
     const volumeKey = getKpiKey('sales_volume', productCode)
-    const priceKey = getKpiKey('avg_price', productCode)
-    const costKey = getKpiKey('avg_cost', productCode)
-
     const volume = parseFloat(editValues[volumeKey] || 0)
-    const price = parseFloat(editValues[priceKey] || 0)
-    const cost = parseFloat(editValues[costKey] || 0)
+
+    // Get prices from fetched data
+    const prices = priceData[productCode] || {}
+    const price = prices.avg_price || 0
+    const cost = prices.avg_cost || 0
 
     if (volume > 0 && price > 0 && cost > 0) {
       return volume * (price - cost)
@@ -619,65 +631,66 @@ try {
 
         {/* Right Column */}
         <Col lg={6}>
-          {/* Preço Médio de Venda Table */}
-          <Card className="mb-4">
-            <Card.Header className="bg-info text-white py-2">
-              <strong>Preço Médio de Venda (R$/L)</strong>
-            </Card.Header>
-            <Card.Body className="p-2">
-              <Table hover size="sm" className="mb-0">
-                <tbody>
-                  {products.map(product => (
-                    <tr key={product.product_code}>
-                      <td>{product.product_name}</td>
-                      <td>{renderInputCell('avg_price', product.product_code, 'reais_per_liter')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-
-          {/* Preço Médio de Custo Table */}
-          <Card className="mb-4">
-            <Card.Header className="bg-secondary text-white py-2">
-              <strong>Preço Médio de Custo (R$/L)</strong>
-            </Card.Header>
-            <Card.Body className="p-2">
-              <Table hover size="sm" className="mb-0">
-                <tbody>
-                  {products.map(product => (
-                    <tr key={product.product_code}>
-                      <td>{product.product_name}</td>
-                      <td>{renderInputCell('avg_cost', product.product_code, 'reais_per_liter')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Card.Body>
-          </Card>
-
           {/* Lucro Bruto Table (Calculated) */}
           <Card className="mb-4">
             <Card.Header className="bg-warning py-2">
-              <strong>Lucro Bruto (R$)</strong>
-              <small className="ms-2 text-muted">(Calculado: Volume × (Preço Venda - Preço Custo))</small>
+              <strong>Lucro Bruto Projetado (R$)</strong>
+              <small className="ms-2">(Volume Alvo × Margem Atual)</small>
             </Card.Header>
             <Card.Body className="p-2">
               <Table hover size="sm" className="mb-0">
-                <tbody>
+                <thead>
                   <tr className="table-light">
-                    <td><strong>TOTAL</strong></td>
-                    <td><ReadOnlyTotalCell value={revenueTotal} unit="reais" /></td>
+                    <th>Produto</th>
+                    <th>Preço Venda</th>
+                    <th>Preço Custo</th>
+                    <th>Margem/L</th>
+                    <th>Lucro Projetado</th>
                   </tr>
-                  {products.map(product => (
-                    <tr key={product.product_code}>
-                      <td>{product.product_name}</td>
-                      <td><ReadOnlyTotalCell value={calculateGrossProfit(product.product_code)} unit="reais" /></td>
-                    </tr>
-                  ))}
+                </thead>
+                <tbody>
+                  {products.map(product => {
+                    const prices = priceData[product.product_code] || {}
+                    const avgPrice = prices.avg_price || 0
+                    const avgCost = prices.avg_cost || 0
+                    const marginPerLiter = avgPrice - avgCost
+                    const grossProfit = calculateGrossProfit(product.product_code)
+
+                    return (
+                      <tr key={product.product_code}>
+                        <td>{product.product_name}</td>
+                        <td className="text-success">
+                          {avgPrice > 0 ? `R$ ${avgPrice.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="text-danger">
+                          {avgCost > 0 ? `R$ ${avgCost.toFixed(2)}` : '-'}
+                        </td>
+                        <td className={marginPerLiter >= 0 ? 'text-success fw-bold' : 'text-danger fw-bold'}>
+                          {marginPerLiter !== 0 ? `R$ ${marginPerLiter.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="fw-bold">
+                          {grossProfit > 0
+                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(grossProfit)
+                            : '-'
+                          }
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  <tr className="table-secondary">
+                    <td colSpan={4}><strong>TOTAL</strong></td>
+                    <td className="fw-bold">
+                      {revenueTotal > 0
+                        ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(revenueTotal)
+                        : '-'
+                      }
+                    </td>
+                  </tr>
                 </tbody>
               </Table>
+              <small className="text-muted">
+                * Preços baseados na média do mês atual. Lucro = Volume Alvo × (Preço Venda - Preço Custo)
+              </small>
             </Card.Body>
           </Card>
 
