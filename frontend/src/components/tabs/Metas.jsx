@@ -470,21 +470,20 @@ try {
     }, 0)
   }
 
-  // Calculate gross profit for a product: Volume × Preço Venda × (Margem Meta % / 100)
+  // Calculate gross profit for a product: Custo × (Margem % / 100) × Volume
   const calculateGrossProfit = (productCode) => {
     const volumeKey = getKpiKey('sales_volume', productCode)
     const marginKey = getKpiKey('margin', productCode)
     const volume = parseFloat(editValues[volumeKey] || 0)
     const targetMargin = parseFloat(editValues[marginKey] || 0)
 
-    // Get sale price from fetched data
+    // Get purchase cost from fetched data
     const prices = priceData[productCode] || {}
-    const price = prices.avg_price || 0
+    const cost = prices.avg_cost || 0
 
-    if (volume > 0 && price > 0 && targetMargin > 0) {
-      // Lucro = Faturamento Projetado × Margem Meta
-      const projectedRevenue = volume * price
-      return projectedRevenue * (targetMargin / 100)
+    if (volume > 0 && cost > 0 && targetMargin > 0) {
+      // Lucro = Custo × (Margem % / 100) × Volume
+      return cost * (targetMargin / 100) * volume
     }
     return 0
   }
@@ -656,44 +655,41 @@ try {
           <Card className="mb-4">
             <Card.Header className="bg-warning py-2">
               <strong>Lucro Bruto Projetado (R$)</strong>
-              <small className="ms-2">(Faturamento × Margem Meta)</small>
+              <small className="ms-2">(Custo × Margem × Volume)</small>
             </Card.Header>
             <Card.Body className="p-2">
               <Table hover size="sm" className="mb-0">
                 <thead>
                   <tr className="table-light">
                     <th>Produto</th>
-                    <th>Último Preço</th>
-                    <th>Faturamento Proj.</th>
+                    <th>Custo Atual</th>
                     <th>Margem Meta</th>
+                    <th>Margem (R$/L)</th>
                     <th>Lucro Projetado</th>
                   </tr>
                 </thead>
                 <tbody>
                   {products.map(product => {
                     const prices = priceData[product.product_code] || {}
-                    const salePrice = prices.avg_price || 0
+                    const cost = prices.avg_cost || 0
                     const volumeKey = getKpiKey('sales_volume', product.product_code)
                     const marginKey = getKpiKey('margin', product.product_code)
                     const volume = parseFloat(editValues[volumeKey] || 0)
                     const targetMargin = parseFloat(editValues[marginKey] || 0)
-                    const projectedRevenue = volume * salePrice
+                    const marginPerLiter = cost * (targetMargin / 100)
                     const grossProfit = calculateGrossProfit(product.product_code)
 
                     return (
                       <tr key={product.product_code}>
                         <td>{product.product_name}</td>
-                        <td className="text-success">
-                          {salePrice > 0 ? `R$ ${salePrice.toFixed(2)}` : '-'}
-                        </td>
-                        <td>
-                          {projectedRevenue > 0
-                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(projectedRevenue)
-                            : '-'
-                          }
+                        <td className="text-danger">
+                          {cost > 0 ? `R$ ${cost.toFixed(2)}` : '-'}
                         </td>
                         <td className={targetMargin > 0 ? 'text-primary fw-bold' : 'text-muted'}>
                           {targetMargin > 0 ? `${targetMargin}%` : '-'}
+                        </td>
+                        <td className="text-success">
+                          {marginPerLiter > 0 ? `R$ ${marginPerLiter.toFixed(2)}` : '-'}
                         </td>
                         <td className="fw-bold">
                           {grossProfit > 0
@@ -716,7 +712,7 @@ try {
                 </tbody>
               </Table>
               <small className="text-muted">
-                * Lucro = (Volume Alvo × Último Preço) × Margem Meta %
+                * Lucro = Custo × (Margem % / 100) × Volume Alvo
               </small>
             </Card.Body>
           </Card>
