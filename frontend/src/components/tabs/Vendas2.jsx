@@ -511,30 +511,6 @@ const Vendas2 = () => {
         )}
       </CollapsibleSection>
 
-      {/* Daily Evolution */}
-      <CollapsibleSection
-        title="Evolução Diária de Volume"
-        storageKey="evolution"
-        defaultOpen={false}
-        headerBg="secondary"
-      >
-        <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={dailyData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="dia" />
-            <YAxis />
-            <Tooltip formatter={(value) => `${Math.round(value).toLocaleString('pt-BR')} L`} />
-            <Legend />
-            <Line type="monotone" dataKey="total" stroke="#000000" strokeWidth={3} name="Total (L)" />
-            <Line type="monotone" dataKey="GC" stroke="#0088FE" strokeWidth={2} name="Gasolina Comum" />
-            <Line type="monotone" dataKey="GA" stroke="#00C49F" strokeWidth={2} name="Gasolina Aditivada" />
-            <Line type="monotone" dataKey="ET" stroke="#FFBB28" strokeWidth={2} name="Etanol" />
-            <Line type="monotone" dataKey="DS10" stroke="#FF8042" strokeWidth={2} name="Diesel S10" />
-            <Line type="monotone" dataKey="DS500" stroke="#8884D8" strokeWidth={2} name="Diesel S500" />
-          </LineChart>
-        </ResponsiveContainer>
-      </CollapsibleSection>
-
       <div style={{ paddingBottom: '2rem' }} />
     </div>
   )
