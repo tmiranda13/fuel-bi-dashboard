@@ -207,10 +207,21 @@ const Vendas2 = () => {
           }
         }
 
-        // Fall back to single payment_method if no breakdown
+        // Fall back to payment_method field if no breakdown
         if (payments.length === 0) {
-          const payment = row.payment_method || 'Outros'
-          payments = [{ method: payment, amount: parseFloat(row.value || 0) }]
+          const paymentMethod = row.payment_method || 'Outros'
+          const totalValue = parseFloat(row.value || 0)
+
+          // Check if payment_method contains comma (legacy split payment format)
+          if (paymentMethod.includes(',')) {
+            const methods = paymentMethod.split(',').map(m => m.trim()).filter(m => m)
+            const splitAmount = totalValue / methods.length
+            methods.forEach(method => {
+              payments.push({ method: method, amount: splitAmount })
+            })
+          } else {
+            payments = [{ method: paymentMethod, amount: totalValue }]
+          }
         }
 
         // Add each payment portion to its respective method
