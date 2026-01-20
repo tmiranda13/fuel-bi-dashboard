@@ -988,13 +988,13 @@ const Vendas = () => {
                   value: p.revenue
                 }))}
                 cx="50%"
-                cy="40%"
+                cy="45%"
                 labelLine={false}
                 label={(entry) => {
                   const total = paymentData.reduce((sum, p) => sum + p.revenue, 0)
                   return `${((entry.value / total) * 100).toFixed(0)}%`
                 }}
-                outerRadius={70}
+                outerRadius={60}
                 fill="#8884d8"
                 dataKey="value"
               >
@@ -1003,7 +1003,7 @@ const Vendas = () => {
                 ))}
               </Pie>
               <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-              <Legend verticalAlign="bottom" height={36} />
+              <Legend verticalAlign="bottom" height={50} />
             </PieChart>
           </ResponsiveContainer>
         ) : (
