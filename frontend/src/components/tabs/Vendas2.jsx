@@ -188,16 +188,43 @@ const Vendas2 = () => {
       })
       setPumpData(Object.values(byPump).sort((a, b) => b.volume - a.volume))
 
-      // Aggregate by payment method
+      // Aggregate by payment method (supports split payments via payment_breakdown)
       const byPayment = {}
       data.forEach(row => {
-        const payment = row.payment_method || 'Outros'
-        if (!byPayment[payment]) {
-          byPayment[payment] = { method: payment, volume: 0, revenue: 0, transactions: 0 }
+        // Check if payment_breakdown exists (new format with split payment support)
+        let payments = []
+        if (row.payment_breakdown) {
+          try {
+            // payment_breakdown is JSON string: [{"method": "CARTAO", "amount": 20}, ...]
+            const breakdown = typeof row.payment_breakdown === 'string'
+              ? JSON.parse(row.payment_breakdown)
+              : row.payment_breakdown
+            if (Array.isArray(breakdown) && breakdown.length > 0) {
+              payments = breakdown
+            }
+          } catch (e) {
+            console.warn('Failed to parse payment_breakdown:', e)
+          }
         }
-        byPayment[payment].volume += parseFloat(row.volume || 0)
-        byPayment[payment].revenue += parseFloat(row.value || 0)
-        byPayment[payment].transactions += 1
+
+        // Fall back to single payment_method if no breakdown
+        if (payments.length === 0) {
+          const payment = row.payment_method || 'Outros'
+          payments = [{ method: payment, amount: parseFloat(row.value || 0) }]
+        }
+
+        // Add each payment portion to its respective method
+        payments.forEach(p => {
+          const method = p.method || 'Outros'
+          const amount = parseFloat(p.amount || 0)
+          if (!byPayment[method]) {
+            byPayment[method] = { method: method, volume: 0, revenue: 0, transactions: 0 }
+          }
+          // Revenue is the payment amount
+          byPayment[method].revenue += amount
+          // For split payments, each portion counts as a partial transaction
+          byPayment[method].transactions += 1
+        })
       })
       setPaymentData(Object.values(byPayment).sort((a, b) => b.revenue - a.revenue))
 

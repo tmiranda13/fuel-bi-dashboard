@@ -11,10 +11,70 @@ Cross-references using: date + product + volume + value + client
 import os
 import re
 import sys
+import logging
 from pathlib import Path
 from datetime import datetime, date
 from openpyxl import load_workbook
 from collections import defaultdict
+from dotenv import load_dotenv
+from supabase import create_client
+
+# Load environment variables
+# Try multiple locations for .env.local
+possible_env_paths = [
+    Path(__file__).parent.parent / 'config' / '.env.local',  # webposto_automator/config/
+    Path(__file__).parent.parent.parent / 'config' / '.env.local',  # original structure
+]
+
+env_loaded = False
+for env_path in possible_env_paths:
+    if env_path.exists():
+        load_dotenv(env_path)
+        env_loaded = True
+        break
+
+if not env_loaded:
+    print("WARNING: .env.local not found. Supabase operations will fail.")
+
+# Setup logging
+# Try webposto_automator location first, then fallback
+LOG_DIR = Path(__file__).parent.parent / "logs"
+if not LOG_DIR.parent.exists():
+    LOG_DIR = Path.home() / "Desktop" / "webposto_reports" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "automation_alerts.log"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger('combined_sales')
+
+# Default company ID
+DEFAULT_COMPANY_ID = 2
+
+
+def get_supabase_client():
+    """Get Supabase client"""
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_KEY")
+    if not url or not key:
+        raise ValueError("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
+    return create_client(url, key)
+
+
+def log_alert(message, level='warning'):
+    """Log an alert message to file and console"""
+    if level == 'error':
+        logger.error(message)
+    elif level == 'warning':
+        logger.warning(message)
+    else:
+        logger.info(message)
 
 
 # Fuel product codes mapping
@@ -257,7 +317,8 @@ def combine_reports(vendas_bico_data, cupons_data):
     """
     Combine data from both reports using matching keys
 
-    Returns combined transactions with all available fields
+    Returns (combined_transactions, match_stats)
+    match_stats contains: matched, unmatched, match_rate, is_perfect_match
     """
     print("\n[INFO] Cross-referencing reports...")
 
@@ -277,6 +338,7 @@ def combine_reports(vendas_bico_data, cupons_data):
     combined = []
     matched = 0
     unmatched = 0
+    unmatched_transactions = []  # Track unmatched for debugging
 
     for txn in vendas_bico_data:
         key = create_match_key(
@@ -316,6 +378,13 @@ def combine_reports(vendas_bico_data, cupons_data):
         else:
             # No match found - keep vendas_bico data with nulls for cupons fields
             unmatched += 1
+            unmatched_transactions.append({
+                'sale_date': txn['sale_date'],
+                'product': txn['product_name'],
+                'volume': txn['volume'],
+                'value': txn['value'],
+                'client': txn['client'],
+            })
             combined.append({
                 'company_id': txn['company_id'],
                 'pump_number': txn['pump_number'],
@@ -334,11 +403,30 @@ def combine_reports(vendas_bico_data, cupons_data):
                 'source_product_code': None,
             })
 
-    print(f"[OK] Combined {len(combined)} transactions")
-    print(f"     Matched: {matched} ({matched/len(combined)*100:.1f}%)")
-    print(f"     Unmatched: {unmatched} ({unmatched/len(combined)*100:.1f}%)")
+    total = len(combined)
+    match_rate = (matched / total * 100) if total > 0 else 0
+    is_perfect_match = (unmatched == 0)
 
-    return combined
+    print(f"[OK] Combined {total} transactions")
+    print(f"     Matched: {matched} ({match_rate:.1f}%)")
+    print(f"     Unmatched: {unmatched} ({100 - match_rate:.1f}%)")
+
+    if not is_perfect_match:
+        print(f"\n[WARNING] MATCH RATE IS NOT 100% - {unmatched} transactions unmatched!")
+        print(f"[WARNING] First 5 unmatched transactions:")
+        for i, txn in enumerate(unmatched_transactions[:5]):
+            print(f"  {i+1}. {txn['sale_date']} | {txn['product']} | {txn['volume']}L | R${txn['value']} | {txn['client']}")
+
+    match_stats = {
+        'matched': matched,
+        'unmatched': unmatched,
+        'total': total,
+        'match_rate': match_rate,
+        'is_perfect_match': is_perfect_match,
+        'unmatched_transactions': unmatched_transactions,
+    }
+
+    return combined, match_stats
 
 
 def aggregate_by_pump(combined_data):
@@ -456,6 +544,73 @@ def print_summary(summary):
         print(f"  {emp}: {data['volume']:,.2f} L / R$ {data['revenue']:,.2f} ({data['count']} txns)")
 
 
+def load_to_database(combined_data, company_id=2):
+    """
+    Load combined sales data to Supabase combined_sales table.
+
+    Checks for duplicates based on (sale_date, pump_number, product_code, volume, value, cupom_number)
+    """
+    print("\n[INFO] Loading to database...")
+
+    supabase = get_supabase_client()
+
+    inserted = 0
+    skipped = 0
+    errors = 0
+
+    for txn in combined_data:
+        try:
+            # Prepare record for database
+            record = {
+                'company_id': txn['company_id'],
+                'sale_date': str(txn['sale_date']),
+                'pump_number': txn['pump_number'],
+                'product_code': txn['product_code'],
+                'product_name': txn['product_name'],
+                'client': txn.get('client'),
+                'volume': txn['volume'],
+                'value': txn['value'],
+                'payment_method': txn.get('payment_method'),
+                'cupom_number': txn.get('cupom_number'),
+                'sale_time': txn.get('sale_time'),
+                'employee': txn.get('employee'),
+                'unit_price': txn.get('unit_price'),
+            }
+
+            # Check for existing record (by unique key)
+            existing = supabase.table('combined_sales').select('id').eq(
+                'company_id', record['company_id']
+            ).eq(
+                'sale_date', record['sale_date']
+            ).eq(
+                'pump_number', record['pump_number']
+            ).eq(
+                'product_code', record['product_code']
+            ).eq(
+                'volume', record['volume']
+            ).eq(
+                'value', record['value']
+            ).execute()
+
+            if existing.data:
+                skipped += 1
+                continue
+
+            # Insert new record
+            supabase.table('combined_sales').insert(record).execute()
+            inserted += 1
+
+            if inserted % 100 == 0:
+                print(f"  [PROGRESS] Inserted {inserted} records...")
+
+        except Exception as e:
+            print(f"  [ERROR] Failed to insert: {e}")
+            errors += 1
+
+    print(f"\n[RESULT] Inserted: {inserted}, Skipped (duplicates): {skipped}, Errors: {errors}")
+    return {'inserted': inserted, 'skipped': skipped, 'errors': errors}
+
+
 def main():
     """Main function"""
     import argparse
@@ -465,6 +620,7 @@ def main():
     parser.add_argument('--cupons', '-c', required=True, help='Path to Cupons por Período.xlsx')
     parser.add_argument('--company-id', type=int, default=2, help='Company ID (default: 2)')
     parser.add_argument('--output', '-o', help='Output CSV file (optional)')
+    parser.add_argument('--load', '-l', action='store_true', help='Load to Supabase database')
 
     args = parser.parse_args()
 
@@ -485,13 +641,57 @@ def main():
     cupons_data = parse_cupons_por_periodo(args.cupons, args.company_id)
 
     # Combine reports
-    combined = combine_reports(vendas_data, cupons_data)
+    combined, match_stats = combine_reports(vendas_data, cupons_data)
+
+    # Check match rate - MUST BE 100%
+    if not match_stats['is_perfect_match']:
+        alert_msg = (
+            f"MATCH RATE NOT 100% | "
+            f"Rate: {match_stats['match_rate']:.2f}% | "
+            f"Unmatched: {match_stats['unmatched']} transactions | "
+            f"Files: {Path(args.vendas_bico).name}, {Path(args.cupons).name}"
+        )
+        log_alert(alert_msg, level='error')
+
+        # Log unmatched transactions details
+        for i, txn in enumerate(match_stats['unmatched_transactions'][:10]):
+            log_alert(f"  Unmatched #{i+1}: {txn['sale_date']} | {txn['product']} | {txn['volume']}L | R${txn['value']}", level='warning')
+
+        print("\n" + "!" * 70)
+        print("ALERT: MATCH RATE IS NOT 100%")
+        print("!" * 70)
+        print(f"Match rate: {match_stats['match_rate']:.2f}%")
+        print(f"Unmatched: {match_stats['unmatched']} transactions")
+        print("\nData will NOT be loaded to database until match rate is 100%.")
+        print(f"Check log file: {LOG_FILE}")
+        print("!" * 70)
+
+        # Don't load to database if match is not perfect
+        if args.load:
+            print("\n[SKIPPED] Database load skipped due to imperfect match rate.")
+            log_alert("Database load SKIPPED - imperfect match rate", level='error')
+            args.load = False  # Prevent loading
+
+        # Return with error status
+        return combined, None, match_stats
 
     # Generate and print summary
     summary = get_summary(combined)
     print_summary(summary)
 
-    # Aggregate for database format
+    # Load to database if requested (only if match is perfect)
+    if args.load:
+        result = load_to_database(combined, args.company_id)
+        log_alert(
+            f"COMBINED SALES LOADED | "
+            f"Inserted: {result['inserted']} | "
+            f"Skipped: {result['skipped']} | "
+            f"Errors: {result['errors']} | "
+            f"Match: 100%",
+            level='info'
+        )
+
+    # Aggregate for database format (for CSV output)
     aggregated = aggregate_by_pump(combined)
 
     # Output to CSV if requested
@@ -506,7 +706,7 @@ def main():
 
     print("\n[DONE] Parsing complete!")
 
-    return combined, aggregated
+    return combined, aggregated, match_stats
 
 
 if __name__ == '__main__':
