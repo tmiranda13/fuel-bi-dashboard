@@ -969,39 +969,32 @@ const Vendas = () => {
       <Card.Body>
         <Card.Title>Formas de Pagamento <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
         {paymentData.length > 0 ? (
-          <>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={paymentData.slice(0, 5).map(p => ({
-                    name: p.method,
-                    value: p.revenue
-                  }))}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={(entry) => {
-                    const total = paymentData.reduce((sum, p) => sum + p.revenue, 0)
-                    return `${((entry.value / total) * 100).toFixed(0)}%`
-                  }}
-                  outerRadius={70}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {paymentData.slice(0, 5).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={['#00C49F', '#0088FE', '#FFBB28', '#FF8042', '#8884D8'][index % 5]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="text-center mt-2">
-              <small className="text-muted">
-                Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(paymentData.reduce((sum, p) => sum + p.revenue, 0))}
-              </small>
-            </div>
-          </>
+          <ResponsiveContainer width="100%" height={280}>
+            <PieChart>
+              <Pie
+                data={paymentData.slice(0, 5).map(p => ({
+                  name: p.method,
+                  value: p.revenue
+                }))}
+                cx="50%"
+                cy="40%"
+                labelLine={false}
+                label={(entry) => {
+                  const total = paymentData.reduce((sum, p) => sum + p.revenue, 0)
+                  return `${((entry.value / total) * 100).toFixed(0)}%`
+                }}
+                outerRadius={70}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                {paymentData.slice(0, 5).map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={['#00C49F', '#0088FE', '#FFBB28', '#FF8042', '#8884D8'][index % 5]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
+              <Legend verticalAlign="bottom" height={36} />
+            </PieChart>
+          </ResponsiveContainer>
         ) : (
           <div className="text-center text-muted py-4">
             Sem dados de pagamento
