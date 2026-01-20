@@ -37,7 +37,7 @@ const InputCell = memo(({ kpiType, productCode, unit, value, onChange, placehold
         style={{ width: '120px' }}
       />
       <span className="text-muted small">
-        {unit === 'liters' ? 'L' : unit === 'percent' ? '%' : 'R$'}
+        {unit === 'liters' ? 'L' : unit === 'percent' ? '%' : unit === 'reais_per_liter' ? 'R$/L' : 'R$'}
       </span>
       {existingKpi && (
         <Badge bg="success" className="ms-1" title="Meta salva">
@@ -62,7 +62,7 @@ const ReadOnlyTotalCell = memo(({ value, unit }) => {
         style={{ width: '120px', backgroundColor: '#e9ecef' }}
       />
       <span className="text-muted small">
-        {unit === 'liters' ? 'L' : unit === 'percent' ? '%' : 'R$'}
+        {unit === 'liters' ? 'L' : unit === 'percent' ? '%' : unit === 'reais_per_liter' ? 'R$/L' : 'R$'}
       </span>
     </div>
   )
@@ -97,7 +97,9 @@ const Metas = () => {
     { value: 'sales_volume', label: 'Volume Mensal', unit: 'liters', description: 'Meta de volume de vendas em litros' },
     { value: 'margin', label: 'Margem Bruta', unit: 'percent', description: 'Meta de margem bruta em %' },
     { value: 'cost', label: 'Mix de Aditivados', unit: 'percent', description: 'Meta de % de vendas de aditivados' },
-    { value: 'revenue', label: 'Lucro Bruto', unit: 'reais', description: 'Meta de lucro bruto em R$' }
+    { value: 'revenue', label: 'Lucro Bruto', unit: 'reais', description: 'Meta de lucro bruto em R$' },
+    { value: 'avg_price', label: 'Preço Médio Venda', unit: 'reais_per_liter', description: 'Preço médio de venda em R$/L' },
+    { value: 'avg_cost', label: 'Preço Médio Custo', unit: 'reais_per_liter', description: 'Preço médio de custo em R$/L' }
   ]
 
   // Local state for editing values
@@ -240,7 +242,6 @@ try {
       
       // Track if we need to save totals
       let hasSalesVolumeChanges = false
-      let hasRevenueChanges = false
 
       for (const key of modifiedKeys) {
         const value = editValues[key]
@@ -257,21 +258,26 @@ try {
         } else if (key.startsWith('cost_')) {
           kpiType = 'cost'
           productCode = key.replace('cost_', '')
+        } else if (key.startsWith('avg_price_')) {
+          kpiType = 'avg_price'
+          productCode = key.replace('avg_price_', '')
+        } else if (key.startsWith('avg_cost_')) {
+          kpiType = 'avg_cost'
+          productCode = key.replace('avg_cost_', '')
         } else if (key.startsWith('revenue_')) {
-          kpiType = 'revenue'
-          productCode = key.replace('revenue_', '')
-          if (productCode !== 'total') hasRevenueChanges = true
+          // Skip revenue - it's calculated automatically
+          continue
         } else {
           continue
         }
 
-        // Skip 'total' for sales_volume and revenue - we'll save calculated totals
-        if ((kpiType === 'sales_volume' || kpiType === 'revenue') && productCode === 'total') {
+        // Skip 'total' for sales_volume - we'll save calculated totals
+        if (kpiType === 'sales_volume' && productCode === 'total') {
           continue
         }
 
         const actualProductCode = productCode === 'total' ? null : productCode
-        
+
         // Wrap each save in its own try-catch
         const saveWithCatch = async () => {
           try {
@@ -281,7 +287,7 @@ try {
             throw err
           }
         }
-        
+
         savePromises.push(saveWithCatch())
       }
 
@@ -297,15 +303,24 @@ try {
         }
       }
 
-      // Calculate and save totals for revenue if any product was modified
-      if (hasRevenueChanges) {
-        const totalRevenue = products.reduce((sum, product) => {
-          const key = getKpiKey('revenue', product.product_code)
-          return sum + parseFloat(editValues[key] || 0)
-        }, 0)
-        
-        if (totalRevenue > 0) {
-          savePromises.push(saveKpi('revenue', null, totalRevenue.toString()))
+      // Calculate and save gross profit (revenue) for each product and total
+      // This happens when volume, price, or cost changes
+      const productsWithProfit = products.filter(product => {
+        const profit = calculateGrossProfit(product.product_code)
+        return profit > 0
+      })
+
+      if (productsWithProfit.length > 0) {
+        // Save individual product gross profits
+        for (const product of productsWithProfit) {
+          const profit = calculateGrossProfit(product.product_code)
+          savePromises.push(saveKpi('revenue', product.product_code, profit.toString()))
+        }
+
+        // Save total gross profit
+        const totalProfit = calculateTotalGrossProfit()
+        if (totalProfit > 0) {
+          savePromises.push(saveKpi('revenue', null, totalProfit.toString()))
         }
       }
 
@@ -380,6 +395,7 @@ try {
     if (type?.unit === 'liters') return 'Ex: 100000'
     if (type?.unit === 'percent') return 'Ex: 15'
     if (type?.unit === 'reais') return 'Ex: 50000'
+    if (type?.unit === 'reais_per_liter') return 'Ex: 5.50'
     return ''
   }
 
@@ -424,9 +440,32 @@ try {
     }, 0)
   }
 
+  // Calculate gross profit for a product: Volume × (Preço Venda - Preço Custo)
+  const calculateGrossProfit = (productCode) => {
+    const volumeKey = getKpiKey('sales_volume', productCode)
+    const priceKey = getKpiKey('avg_price', productCode)
+    const costKey = getKpiKey('avg_cost', productCode)
+
+    const volume = parseFloat(editValues[volumeKey] || 0)
+    const price = parseFloat(editValues[priceKey] || 0)
+    const cost = parseFloat(editValues[costKey] || 0)
+
+    if (volume > 0 && price > 0 && cost > 0) {
+      return volume * (price - cost)
+    }
+    return 0
+  }
+
+  // Calculate total gross profit across all products
+  const calculateTotalGrossProfit = () => {
+    return products.reduce((sum, product) => {
+      return sum + calculateGrossProfit(product.product_code)
+    }, 0)
+  }
+
   // Get calculated totals for sales_volume and revenue
   const salesVolumeTotal = calculateTotal('sales_volume')
-  const revenueTotal = calculateTotal('revenue')
+  const revenueTotal = calculateTotalGrossProfit()
 
   // Previous month for copy feature
   const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1
@@ -580,10 +619,49 @@ try {
 
         {/* Right Column */}
         <Col lg={6}>
-          {/* Lucro Bruto Table */}
+          {/* Preço Médio de Venda Table */}
+          <Card className="mb-4">
+            <Card.Header className="bg-info text-white py-2">
+              <strong>Preço Médio de Venda (R$/L)</strong>
+            </Card.Header>
+            <Card.Body className="p-2">
+              <Table hover size="sm" className="mb-0">
+                <tbody>
+                  {products.map(product => (
+                    <tr key={product.product_code}>
+                      <td>{product.product_name}</td>
+                      <td>{renderInputCell('avg_price', product.product_code, 'reais_per_liter')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Card.Body>
+          </Card>
+
+          {/* Preço Médio de Custo Table */}
+          <Card className="mb-4">
+            <Card.Header className="bg-secondary text-white py-2">
+              <strong>Preço Médio de Custo (R$/L)</strong>
+            </Card.Header>
+            <Card.Body className="p-2">
+              <Table hover size="sm" className="mb-0">
+                <tbody>
+                  {products.map(product => (
+                    <tr key={product.product_code}>
+                      <td>{product.product_name}</td>
+                      <td>{renderInputCell('avg_cost', product.product_code, 'reais_per_liter')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Card.Body>
+          </Card>
+
+          {/* Lucro Bruto Table (Calculated) */}
           <Card className="mb-4">
             <Card.Header className="bg-warning py-2">
               <strong>Lucro Bruto (R$)</strong>
+              <small className="ms-2 text-muted">(Calculado: Volume × (Preço Venda - Preço Custo))</small>
             </Card.Header>
             <Card.Body className="p-2">
               <Table hover size="sm" className="mb-0">
@@ -595,7 +673,7 @@ try {
                   {products.map(product => (
                     <tr key={product.product_code}>
                       <td>{product.product_name}</td>
-                      <td>{renderInputCell('revenue', product.product_code, 'reais')}</td>
+                      <td><ReadOnlyTotalCell value={calculateGrossProfit(product.product_code)} unit="reais" /></td>
                     </tr>
                   ))}
                 </tbody>
