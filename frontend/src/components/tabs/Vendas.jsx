@@ -980,7 +980,7 @@ const Vendas = () => {
       <Card.Body>
         <Card.Title>Formas de Pagamento <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
         {paymentData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie
                 data={paymentData.slice(0, 5).map(p => ({
@@ -988,20 +988,10 @@ const Vendas = () => {
                   value: p.revenue
                 }))}
                 cx="50%"
-                cy="38%"
+                cy="40%"
                 labelLine={false}
-                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
-                  const RADIAN = Math.PI / 180
-                  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
-                  const x = cx + radius * Math.cos(-midAngle * RADIAN)
-                  const y = cy + radius * Math.sin(-midAngle * RADIAN)
-                  return (
-                    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">
-                      {`${(percent * 100).toFixed(0)}%`}
-                    </text>
-                  )
-                }}
-                outerRadius={80}
+                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                outerRadius={70}
                 fill="#8884d8"
                 dataKey="value"
               >
@@ -1010,7 +1000,7 @@ const Vendas = () => {
                 ))}
               </Pie>
               <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-              <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '20px' }} />
+              <Legend verticalAlign="bottom" height={36} />
             </PieChart>
           </ResponsiveContainer>
         ) : (
