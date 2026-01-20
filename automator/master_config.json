@@ -1,0 +1,102 @@
+{
+  "common_steps": {
+    "step_1_relatorios_tab": {"action": "click", "x": 446, "y": 60},
+    "step_2_activate_search": {"action": "click", "x": 1540, "y": 115},
+    "step_3_search_field": {"action": "click", "x": 857, "y": 339},
+    "step_5_confirm_selection": {"action": "click", "x": 1135, "y": 747},
+    "step_6_generate_report": {"action": "click", "x": 362, "y": 1017},
+    "step_7_menu_export": {"action": "click", "x": 139, "y": 110},
+    "step_8_export_button": {"action": "click", "x": 151, "y": 190},
+    "step_9_save_button": {"action": "click", "x": 774, "y": 737},
+    "step_10_close_explorer": {"action": "click", "x": 1883, "y": 17}
+  },
+  "no_data_dialog": {
+    "ok_button": {"x": 1118, "y": 634},
+    "applies_to": ["entrada_de_mercadorias"]
+  },
+  "reports": {
+    "estoque_do_medidor": {
+      "webposto_name": "estoque do medidor",
+      "close_coords": [630, 225],
+      "config_steps": [],
+      "schedule": "every_15_min"
+    },
+    "vendas_por_bico": {
+      "webposto_name": "VENDAS POR BICO",
+      "close_coords": [606, 223],
+      "config_steps": [
+        {"action": "click", "name": "uncheck sintetico box", "x": 33, "y": 863}
+      ],
+      "schedule": "every_15_min"
+    },
+    "cupons_por_periodo": {
+      "webposto_name": "Cupons por periodo",
+      "close_coords": [630, 220],
+      "config_steps": [
+        {"action": "click", "name": "select formas de pagamento", "x": 33, "y": 712},
+        {"action": "click", "name": "select cheque", "x": 43, "y": 777},
+        {"action": "click", "name": "select dinheiro", "x": 43, "y": 813},
+        {"action": "click", "name": "select cartao", "x": 42, "y": 849},
+        {"action": "click", "name": "select notas", "x": 44, "y": 882},
+        {"action": "click", "name": "select tef", "x": 44, "y": 919},
+        {"action": "click", "name": "select carta frete", "x": 43, "y": 953},
+        {"action": "click", "name": "select vale", "x": 211, "y": 780},
+        {"action": "click", "name": "select diversos", "x": 209, "y": 812},
+        {"action": "click", "name": "select bank transfer", "x": 210, "y": 848},
+        {"action": "click", "name": "select pre paid", "x": 211, "y": 883},
+        {"action": "click", "name": "select emprestimo", "x": 209, "y": 919},
+        {"action": "click", "name": "scroll down", "x": 394, "y": 942},
+        {"action": "click", "name": "select data sorting", "x": 156, "y": 524},
+        {"action": "click", "name": "select full report", "x": 210, "y": 856},
+        {"action": "click", "name": "select grouping", "x": 41, "y": 922}
+      ],
+      "schedule": "every_15_min"
+    },
+    "historico_de_consumo": {
+      "webposto_name": "HISTORICO DE CONSUMO",
+      "close_coords": [639, 222],
+      "config_steps": [
+        {"action": "click", "name": "select fuel report", "x": 30, "y": 541},
+        {"action": "click", "name": "select product group field", "x": 325, "y": 541},
+        {"action": "type", "name": "narrow search", "text": "c"},
+        {"action": "click", "name": "select fuel group products", "x": 203, "y": 639},
+        {"action": "key", "key": "enter"},
+        {"action": "click", "name": "select sorting", "x": 43, "y": 870}
+      ],
+      "schedule": "every_15_min"
+    },
+    "entrada_de_mercadorias": {
+      "webposto_name": "ENTRADA DE MERCADORIAS",
+      "close_coords": [651, 222],
+      "config_steps": [
+        {"action": "click", "name": "check returned receipts", "x": 45, "y": 398},
+        {"action": "click", "name": "check received receipts", "x": 47, "y": 440},
+        {"action": "click", "name": "check product type", "x": 35, "y": 573},
+        {"action": "click", "name": "dropdown product group", "x": 362, "y": 571},
+        {"action": "click", "name": "checkbox for fuel", "x": 204, "y": 777},
+        {"action": "key", "key": "enter"},
+        {"action": "click", "name": "check complete report", "x": 43, "y": 796},
+        {"action": "click", "name": "check sort by supplier", "x": 45, "y": 910}
+      ],
+      "has_no_data_dialog": true,
+      "schedule": "every_15_min"
+    },
+    "resumo_do_dia": {
+      "webposto_name": "resumo do dia",
+      "close_coords": [611, 219],
+      "config_steps": [
+        {"action": "click", "name": "select date field", "x": 235, "y": 275},
+        {"action": "key", "key": "backspace"},
+        {"action": "key", "key": "backspace"},
+        {"action": "key", "key": "backspace"},
+        {"action": "key", "key": "backspace"},
+        {"action": "key", "key": "backspace"},
+        {"action": "key", "key": "backspace"},
+        {"action": "key", "key": "backspace"},
+        {"action": "key", "key": "backspace"},
+        {"action": "type", "name": "yesterday date", "text": "{yesterday}"}
+      ],
+      "schedule": "daily_midnight"
+    }
+  }
+}
