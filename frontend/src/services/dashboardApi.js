@@ -90,8 +90,9 @@ async function getAverageCosts() {
 }
 
 export async function fetchVendasDashboard(startDate, endDate) {
+  // Use getCombinedSales instead of getSales (combined_sales is populated by 15-min cycle)
   const [sales, kpis, avgCosts] = await Promise.all([
-    salesService.getSales(startDate, endDate),
+    salesService.getCombinedSales(startDate, endDate),
     kpisService.getKpis(),
     getAverageCosts()
   ])
@@ -99,7 +100,8 @@ export async function fetchVendasDashboard(startDate, endDate) {
   const salesByProduct = {}
   sales.forEach(sale => {
     // Use canonical code for grouping, but preserve original data
-    const canonicalCode = getProductCode(sale.product_name) || sale.product_code
+    // combined_sales uses 'product_code' directly
+    const canonicalCode = sale.product_code || getProductCode(sale.product_name)
     if (!canonicalCode) return
 
     if (!salesByProduct[canonicalCode]) {
@@ -113,8 +115,9 @@ export async function fetchVendasDashboard(startDate, endDate) {
     }
     // Track all original codes that map to this canonical code
     salesByProduct[canonicalCode].original_codes.add(sale.product_code)
-    salesByProduct[canonicalCode].volume += parseFloat(sale.volume_sold || 0)
-    salesByProduct[canonicalCode].revenue += parseFloat(sale.total_revenue || 0)
+    // combined_sales uses 'volume' and 'value' fields
+    salesByProduct[canonicalCode].volume += parseFloat(sale.volume || 0)
+    salesByProduct[canonicalCode].revenue += parseFloat(sale.value || 0)
   })
 
   const products = Object.values(salesByProduct).map(p => {
@@ -214,11 +217,12 @@ export async function fetchComprasDashboard(startDate, endDate) {
 }
 
 export async function fetchEstoqueDashboard(startDate, endDate) {
+  // Use getCombinedSales instead of getSales (combined_sales is populated by 15-min cycle)
   const [tankLevels, losses, kpis, sales, purchases, avgCosts] = await Promise.all([
     inventoryService.getTankLevels(),
     inventoryService.getLossesSummary(startDate, endDate),
     kpisService.getKpis(),
-    salesService.getSales(startDate, endDate),
+    salesService.getCombinedSales(startDate, endDate),
     purchasesService.getPurchases(startDate, endDate),
     getAverageCosts()
   ])
@@ -233,10 +237,11 @@ export async function fetchEstoqueDashboard(startDate, endDate) {
 
   const exitsByProduct = {}
   sales.forEach(s => {
-    const code = getProductCode(s.product_name) || s.product_code
+    // combined_sales uses 'product_code' and 'volume' fields
+    const code = s.product_code || getProductCode(s.product_name)
     if (!code) return
     if (!exitsByProduct[code]) exitsByProduct[code] = 0
-    exitsByProduct[code] += parseFloat(s.volume_sold || 0)
+    exitsByProduct[code] += parseFloat(s.volume || 0)
   })
 
   const start = new Date(startDate)

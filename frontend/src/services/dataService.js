@@ -126,6 +126,38 @@ export const salesService = {
     }, {})
 
     return Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date))
+  },
+
+  // Get sales from combined_sales table (more reliable, populated by 15-min cycle)
+  async getCombinedSales(startDate, endDate) {
+    const allData = []
+    let from = 0
+    const pageSize = 1000
+
+    while (true) {
+      let query = supabase
+        .from('combined_sales')
+        .select('*')
+        .eq('company_id', COMPANY_ID)
+
+      if (startDate) query = query.gte('sale_date', startDate)
+      if (endDate) query = query.lte('sale_date', endDate)
+
+      query = query.order('sale_date', { ascending: true }).range(from, from + pageSize - 1)
+
+      const { data, error } = await query
+      if (error) throw error
+
+      if (!data || data.length === 0) break
+
+      allData.push(...data)
+
+      if (data.length < pageSize) break
+
+      from += pageSize
+    }
+
+    return allData
   }
 }
 
