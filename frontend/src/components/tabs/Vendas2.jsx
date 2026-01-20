@@ -161,11 +161,15 @@ const Vendas2 = () => {
       data.forEach(row => {
         const emp = row.employee || 'Não Identificado'
         if (!byEmployee[emp]) {
-          byEmployee[emp] = { name: emp, volume: 0, revenue: 0, transactions: 0 }
+          byEmployee[emp] = { name: emp, volume: 0, revenue: 0, transactions: 0, volumeGA: 0, volumeGC: 0 }
         }
-        byEmployee[emp].volume += parseFloat(row.volume || 0)
+        const vol = parseFloat(row.volume || 0)
+        byEmployee[emp].volume += vol
         byEmployee[emp].revenue += parseFloat(row.value || 0)
         byEmployee[emp].transactions += 1
+        // Track GA and GC volumes for mix calculation
+        if (row.product_code === 'GA') byEmployee[emp].volumeGA += vol
+        if (row.product_code === 'GC') byEmployee[emp].volumeGC += vol
       })
       setEmployeeData(Object.values(byEmployee).sort((a, b) => b.revenue - a.revenue))
 
@@ -376,26 +380,34 @@ const Vendas2 = () => {
               <thead>
                 <tr>
                   <th>Funcionário</th>
-                  <th>Transações</th>
                   <th>Volume (L)</th>
                   <th>Faturamento</th>
                   <th>Ticket Médio</th>
+                  <th>Mix GA</th>
                   <th>% do Total</th>
                 </tr>
               </thead>
               <tbody>
-                {employeeData.map((emp, index) => (
-                  <tr key={index}>
-                    <td><strong>{emp.name}</strong></td>
-                    <td>{emp.transactions.toLocaleString('pt-BR')}</td>
-                    <td>{Math.round(emp.volume).toLocaleString('pt-BR')} L</td>
-                    <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(emp.revenue)}</td>
-                    <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(emp.revenue / emp.transactions)}</td>
-                    <td>
-                      <Badge bg="primary">{((emp.revenue / totalRevenue) * 100).toFixed(1)}%</Badge>
-                    </td>
-                  </tr>
-                ))}
+                {employeeData.map((emp, index) => {
+                  const totalGasoline = emp.volumeGA + emp.volumeGC
+                  const mixGA = totalGasoline > 0 ? (emp.volumeGA / totalGasoline) * 100 : 0
+                  return (
+                    <tr key={index}>
+                      <td><strong>{emp.name}</strong></td>
+                      <td>{Math.round(emp.volume).toLocaleString('pt-BR')} L</td>
+                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(emp.revenue)}</td>
+                      <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(emp.revenue / emp.transactions)}</td>
+                      <td>
+                        <Badge bg={mixGA >= 30 ? 'success' : mixGA >= 20 ? 'warning' : 'secondary'}>
+                          {mixGA.toFixed(1)}%
+                        </Badge>
+                      </td>
+                      <td>
+                        <Badge bg="primary">{((emp.revenue / totalRevenue) * 100).toFixed(1)}%</Badge>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </Table>
           </Col>
@@ -420,54 +432,6 @@ const Vendas2 = () => {
                 <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
                 <Legend />
               </PieChart>
-            </ResponsiveContainer>
-          </Col>
-        </Row>
-      </CollapsibleSection>
-
-      {/* Payment Methods */}
-      <CollapsibleSection
-        title="Formas de Pagamento"
-        storageKey="payment"
-        defaultOpen={false}
-        headerBg="info"
-      >
-        <Row>
-          <Col lg={6}>
-            <Table responsive hover size="sm">
-              <thead>
-                <tr>
-                  <th>Forma de Pagamento</th>
-                  <th>Transações</th>
-                  <th>Faturamento</th>
-                  <th>%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paymentData.map((pay, index) => (
-                  <tr key={index}>
-                    <td>
-                      <span className="badge me-2" style={{ backgroundColor: paymentColors[pay.method] || '#6c757d' }}>
-                        {pay.method}
-                      </span>
-                    </td>
-                    <td>{pay.transactions.toLocaleString('pt-BR')}</td>
-                    <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pay.revenue)}</td>
-                    <td>{((pay.revenue / totalRevenue) * 100).toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Col>
-          <Col lg={6}>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={paymentData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tickFormatter={(value) => `R$ ${(value/1000).toFixed(0)}k`} />
-                <YAxis dataKey="method" type="category" width={100} />
-                <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-                <Bar dataKey="revenue" fill="#0088FE" name="Faturamento" />
-              </BarChart>
             </ResponsiveContainer>
           </Col>
         </Row>
