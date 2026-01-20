@@ -988,7 +988,7 @@ const Vendas = () => {
                   value: p.revenue
                 }))}
                 cx="50%"
-                cy="40%"
+                cy="45%"
                 labelLine={false}
                 label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                 outerRadius={70}
