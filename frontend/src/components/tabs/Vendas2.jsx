@@ -437,6 +437,39 @@ const Vendas2 = () => {
         </Row>
       </CollapsibleSection>
 
+      {/* Payment Methods */}
+      <CollapsibleSection
+        title="Formas de Pagamento"
+        storageKey="payment"
+        defaultOpen={false}
+        headerBg="info"
+      >
+        <Table responsive hover size="sm">
+          <thead>
+            <tr>
+              <th>Forma de Pagamento</th>
+              <th>Transações</th>
+              <th>Faturamento</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paymentData.map((pay, index) => (
+              <tr key={index}>
+                <td>
+                  <span className="badge me-2" style={{ backgroundColor: paymentColors[pay.method] || '#6c757d' }}>
+                    {pay.method}
+                  </span>
+                </td>
+                <td>{pay.transactions.toLocaleString('pt-BR')}</td>
+                <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pay.revenue)}</td>
+                <td>{((pay.revenue / totalRevenue) * 100).toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </CollapsibleSection>
+
       {/* Pump Performance */}
       <CollapsibleSection
         title="Desempenho por Bomba"
