@@ -633,10 +633,6 @@ try {
             <Card.Body className="p-2">
               <Table hover size="sm" className="mb-0">
                 <tbody>
-                  <tr className="table-light">
-                    <td><strong>TOTAL</strong></td>
-                    <td>{renderInputCell('margin', 'total', 'percent')}</td>
-                  </tr>
                   {products.map(product => (
                     <tr key={product.product_code}>
                       <td>{product.product_name}</td>
