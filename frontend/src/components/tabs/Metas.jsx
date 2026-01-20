@@ -3,6 +3,7 @@ import { Row, Col, Card, Badge, Form, Button, Table, Alert, Spinner } from 'reac
 import { sortProductsByStandardOrder, PRODUCT_ORDER, PRODUCT_NAMES, fetchVendasDashboard } from '../../services/dashboardApi'
 import { kpisService } from '../../services/dataService'
 import { useAuth } from '../../App'
+import { supabase } from '../../services/supabase'
 
 // Input cell component
 const InputCell = memo(({ kpiType, productCode, unit, value, onChange, placeholder, existingKpi }) => {
@@ -114,7 +115,7 @@ const Metas = () => {
     yearOptions.push(y)
   }
 
-  // Fetch products and current prices from sales data
+  // Fetch products and latest prices from sales data
   const fetchProductsAndPrices = async () => {
     try {
       const productList = PRODUCT_ORDER.map(code => ({
@@ -123,23 +124,40 @@ const Metas = () => {
       }))
       setProducts(productList)
 
-      // Fetch current month's sales data to get avg prices
-      const now = new Date()
-      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-      const today = now.toISOString().split('T')[0]
-
-      const vendasData = await fetchVendasDashboard(monthStart, today)
-
-      // Build price lookup by product code
+      // Fetch latest prices from combined_sales (most recent sale per product)
       const prices = {}
-      if (vendasData?.products) {
-        vendasData.products.forEach(p => {
-          prices[p.product_code] = {
-            avg_price: parseFloat(p.avg_price || 0),
-            avg_cost: parseFloat(p.avg_cost || 0)
-          }
-        })
+
+      for (const code of PRODUCT_ORDER) {
+        // Get the most recent sale for this product
+        const { data: latestSale } = await supabase
+          .from('combined_sales')
+          .select('unit_price, sale_date')
+          .eq('company_id', 2)
+          .eq('product_code', code)
+          .not('unit_price', 'is', null)
+          .order('sale_date', { ascending: false })
+          .limit(1)
+          .single()
+
+        // Get the most recent purchase for this product (for cost)
+        const { data: latestPurchase } = await supabase
+          .from('purchases')
+          .select('unit_price, purchase_date')
+          .eq('company_id', 2)
+          .eq('product_code', code)
+          .not('unit_price', 'is', null)
+          .order('purchase_date', { ascending: false })
+          .limit(1)
+          .single()
+
+        prices[code] = {
+          avg_price: parseFloat(latestSale?.unit_price || 0),
+          avg_cost: parseFloat(latestPurchase?.unit_price || 0),
+          price_date: latestSale?.sale_date || null,
+          cost_date: latestPurchase?.purchase_date || null
+        }
       }
+
       setPriceData(prices)
     } catch (err) {
       console.error('Error fetching products and prices:', err)
@@ -635,7 +653,7 @@ try {
           <Card className="mb-4">
             <Card.Header className="bg-warning py-2">
               <strong>Lucro Bruto Projetado (R$)</strong>
-              <small className="ms-2">(Volume Alvo × Margem Atual)</small>
+              <small className="ms-2">(Volume Alvo × Último Preço)</small>
             </Card.Header>
             <Card.Body className="p-2">
               <Table hover size="sm" className="mb-0">
@@ -689,7 +707,7 @@ try {
                 </tbody>
               </Table>
               <small className="text-muted">
-                * Preços baseados na média do mês atual. Lucro = Volume Alvo × (Preço Venda - Preço Custo)
+                * Preços baseados na última venda/compra registrada. Lucro = Volume Alvo × (Preço Venda - Preço Custo)
               </small>
             </Card.Body>
           </Card>
