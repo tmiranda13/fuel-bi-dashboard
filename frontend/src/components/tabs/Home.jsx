@@ -652,9 +652,10 @@ const Home = ({ onNavigateToTab }) => {
                             style={{ height: '8px' }}
                             className="mb-1"
                           />
-                          <small className="text-muted">
-                            Projeção: {currentMonthData.projected.toLocaleString('pt-BR')} L
-                          </small>
+                          <div className="mt-1 p-2 bg-primary bg-opacity-10 rounded">
+                            <small className="text-muted">Projeção: </small>
+                            <strong className="text-primary fs-6">{currentMonthData.projected.toLocaleString('pt-BR')} L</strong>
+                          </div>
                         </>
                       ) : (
                         <span className="text-muted">Carregando...</span>
