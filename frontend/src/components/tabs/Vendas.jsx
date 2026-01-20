@@ -980,7 +980,7 @@ const Vendas = () => {
       <Card.Body>
         <Card.Title>Formas de Pagamento <small className="text-success ms-2">✓ Dados Reais</small></Card.Title>
         {paymentData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
                 data={paymentData.slice(0, 5).map(p => ({
@@ -988,13 +988,20 @@ const Vendas = () => {
                   value: p.revenue
                 }))}
                 cx="50%"
-                cy="45%"
+                cy="38%"
                 labelLine={false}
-                label={(entry) => {
-                  const total = paymentData.reduce((sum, p) => sum + p.revenue, 0)
-                  return `${((entry.value / total) * 100).toFixed(0)}%`
+                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+                  const RADIAN = Math.PI / 180
+                  const radius = innerRadius + (outerRadius - innerRadius) * 0.5
+                  const x = cx + radius * Math.cos(-midAngle * RADIAN)
+                  const y = cy + radius * Math.sin(-midAngle * RADIAN)
+                  return (
+                    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight="bold">
+                      {`${(percent * 100).toFixed(0)}%`}
+                    </text>
+                  )
                 }}
-                outerRadius={60}
+                outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
               >
@@ -1003,7 +1010,7 @@ const Vendas = () => {
                 ))}
               </Pie>
               <Tooltip formatter={(value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)} />
-              <Legend verticalAlign="bottom" height={50} />
+              <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '20px' }} />
             </PieChart>
           </ResponsiveContainer>
         ) : (
