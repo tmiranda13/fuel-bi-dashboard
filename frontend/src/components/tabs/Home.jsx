@@ -51,16 +51,17 @@ const Home = ({ onNavigateToTab }) => {
         const vmd = daysElapsed > 0 ? totalVolume / daysElapsed : 0
         const projected = Math.round(vmd * daysInMonth)
 
-        // Fetch monthly target from kpis table
+        // Fetch monthly target from kpis table (order by created_at to get most recent)
         const { data: kpiData } = await supabase
           .from('kpis')
           .select('target_value')
           .eq('company_id', 2)
           .eq('kpi_type', 'sales_volume')
           .is('product_code', null)
-          .single()
+          .order('created_at', { ascending: false })
+          .limit(1)
 
-        const monthlyTarget = kpiData?.target_value ? parseFloat(kpiData.target_value) : null
+        const monthlyTarget = kpiData?.[0]?.target_value ? parseFloat(kpiData[0].target_value) : null
 
         setCurrentMonthData({
           vmd: Math.round(vmd),
