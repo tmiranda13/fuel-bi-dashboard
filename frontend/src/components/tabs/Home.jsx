@@ -160,16 +160,17 @@ const Home = ({ onNavigateToTab }) => {
         .lte('sale_date', yesterdayStr)
         .eq('company_id', 2)
 
-      // Aggregate employee data (GA mix and revenue)
+      // Aggregate employee data (GA mix and volume)
       const empData = {}
       employeeSales?.forEach(row => {
         const emp = row.employee || 'Não Identificado'
         if (!empData[emp]) {
-          empData[emp] = { name: emp, volumeGA: 0, volumeGC: 0, revenue: 0 }
+          empData[emp] = { name: emp, volumeGA: 0, volumeGC: 0, totalVolume: 0, revenue: 0 }
         }
         const vol = parseFloat(row.volume || 0)
         const val = parseFloat(row.value || 0)
         empData[emp].revenue += val
+        empData[emp].totalVolume += vol
         if (row.product_code === 'GA') empData[emp].volumeGA += vol
         if (row.product_code === 'GC') empData[emp].volumeGC += vol
       })
@@ -180,8 +181,8 @@ const Home = ({ onNavigateToTab }) => {
           totalGasoline: e.volumeGA + e.volumeGC,
           mixGA: (e.volumeGA + e.volumeGC) > 0 ? (e.volumeGA / (e.volumeGA + e.volumeGC)) * 100 : 0
         }))
-        .filter(e => e.revenue > 0) // Only employees with sales
-        .sort((a, b) => b.revenue - a.revenue)
+        .filter(e => e.totalVolume > 0) // Only employees with sales
+        .sort((a, b) => b.totalVolume - a.totalVolume)
 
       // Build alerts array
       const alerts = []
@@ -773,7 +774,7 @@ const Home = ({ onNavigateToTab }) => {
                               <tr>
                                 <th>#</th>
                                 <th>Nome</th>
-                                <th>Faturamento</th>
+                                <th>Litros</th>
                                 <th>Mix GA</th>
                               </tr>
                             </thead>
@@ -782,7 +783,7 @@ const Home = ({ onNavigateToTab }) => {
                                 <tr key={emp.name}>
                                   <td><Badge bg="success">{idx + 1}</Badge></td>
                                   <td><strong>{emp.name}</strong></td>
-                                  <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(emp.revenue)}</td>
+                                  <td>{Math.round(emp.totalVolume).toLocaleString('pt-BR')} L</td>
                                   <td><Badge bg={emp.mixGA >= 20 ? 'success' : 'warning'}>{emp.mixGA.toFixed(1)}%</Badge></td>
                                 </tr>
                               ))}
@@ -804,7 +805,7 @@ const Home = ({ onNavigateToTab }) => {
                               <tr>
                                 <th>#</th>
                                 <th>Nome</th>
-                                <th>Faturamento</th>
+                                <th>Litros</th>
                                 <th>Mix GA</th>
                               </tr>
                             </thead>
@@ -813,7 +814,7 @@ const Home = ({ onNavigateToTab }) => {
                                 <tr key={emp.name}>
                                   <td><Badge bg="danger">{insightsData.employeeGAMix.length - 2 + idx}</Badge></td>
                                   <td><strong>{emp.name}</strong></td>
-                                  <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(emp.revenue)}</td>
+                                  <td>{Math.round(emp.totalVolume).toLocaleString('pt-BR')} L</td>
                                   <td><Badge bg={emp.mixGA >= 20 ? 'success' : 'danger'}>{emp.mixGA.toFixed(1)}%</Badge></td>
                                 </tr>
                               ))}
