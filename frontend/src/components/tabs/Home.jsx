@@ -164,48 +164,13 @@ const Home = ({ onNavigateToTab }) => {
       // Build alerts array
       const alerts = []
 
-      // Low autonomy alerts (from estoque)
+      // Low autonomy alerts (from estoque only)
       const lowAutonomy = estoqueDataParam?.inventory?.filter(item => parseFloat(item.days_autonomy || 0) < 3) || []
       lowAutonomy.forEach(item => {
         alerts.push({
           type: 'stock',
           severity: 'danger',
           message: `${normalizeProductName(item.product_name)}: ${parseFloat(item.days_autonomy).toFixed(1)} dias de autonomia`
-        })
-      })
-
-      // Underperforming bicos (fetch from combined_sales)
-      const { data: bicoSales } = await supabase
-        .from('combined_sales')
-        .select('pump_number, product_code, volume')
-        .gte('sale_date', sevenDaysAgoStr)
-        .lte('sale_date', yesterdayStr)
-        .eq('company_id', 2)
-
-      // Group by product and calculate averages
-      const bicoByProduct = {}
-      bicoSales?.forEach(row => {
-        const pump = row.pump_number
-        const product = row.product_code
-        if (!bicoByProduct[product]) bicoByProduct[product] = {}
-        if (!bicoByProduct[product][pump]) bicoByProduct[product][pump] = 0
-        bicoByProduct[product][pump] += parseFloat(row.volume || 0)
-      })
-
-      // Find underperforming bicos (>25% below average for their product)
-      Object.entries(bicoByProduct).forEach(([product, pumps]) => {
-        const volumes = Object.values(pumps)
-        if (volumes.length < 2) return
-        const avg = volumes.reduce((a, b) => a + b, 0) / volumes.length
-        Object.entries(pumps).forEach(([pump, vol]) => {
-          const diff = ((vol - avg) / avg) * 100
-          if (diff < -25) {
-            alerts.push({
-              type: 'bico',
-              severity: 'warning',
-              message: `Bico ${pump} (${product}): ${diff.toFixed(0)}% abaixo da média`
-            })
-          }
         })
       })
 
@@ -744,9 +709,7 @@ const Home = ({ onNavigateToTab }) => {
                     {insightsData.alerts.map((alert, idx) => (
                       <Col key={idx} md={6} lg={4} className="mb-2">
                         <Alert variant={alert.severity} className="py-2 px-3 mb-0 d-flex align-items-center">
-                          <span className="me-2">
-                            {alert.type === 'stock' ? '⛽' : alert.type === 'bico' ? '🔧' : '⚠️'}
-                          </span>
+                          <span className="me-2">⛽</span>
                           <small>{alert.message}</small>
                         </Alert>
                       </Col>
