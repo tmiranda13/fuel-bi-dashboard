@@ -588,16 +588,19 @@ const Home = ({ onNavigateToTab }) => {
                           <div className="fs-4 fw-bold">
                             {Math.round(insightsData.yesterday.total_volume || 0).toLocaleString('pt-BR')} L
                           </div>
-                          {insightsData.lastWeekSameDay && (() => {
-                            const yesterdayVol = insightsData.yesterday.total_volume || 0
-                            const lastWeekVol = insightsData.lastWeekSameDay.total_volume || 0
-                            const diff = lastWeekVol > 0 ? ((yesterdayVol - lastWeekVol) / lastWeekVol) * 100 : 0
-                            const isUp = diff >= 0
-                            return (
-                              <div className={`small ${isUp ? 'text-success' : 'text-danger'}`}>
-                                {isUp ? '↑' : '↓'} {Math.abs(diff).toFixed(1)}% vs. semana passada
-                              </div>
-                            )
+                          {(() => {
+                            const yesterdayVol = insightsData.yesterday?.total_volume || 0
+                            const lastWeekVol = insightsData.lastWeekSameDay?.total_volume || 0
+                            if (lastWeekVol > 0) {
+                              const diff = ((yesterdayVol - lastWeekVol) / lastWeekVol) * 100
+                              const isUp = diff >= 0
+                              return (
+                                <div className={`small ${isUp ? 'text-success' : 'text-danger'}`}>
+                                  {isUp ? '↑' : '↓'} {Math.abs(diff).toFixed(1)}% vs. semana passada
+                                </div>
+                              )
+                            }
+                            return <div className="small text-muted">Sem dados semana passada</div>
                           })()}
                           <small className="text-muted">
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(insightsData.yesterday.total_revenue || 0)}
