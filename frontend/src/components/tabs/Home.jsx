@@ -134,25 +134,26 @@ const Home = ({ onNavigateToTab }) => {
 
       const { data: employeeSales } = await supabase
         .from('combined_sales')
-        .select('employee, product_code, volume')
+        .select('employee, product_code, volume, value')
         .gte('sale_date', sevenDaysAgoStr)
         .lte('sale_date', yesterdayStr)
         .eq('company_id', 2)
-        .in('product_code', ['GA', 'GC'])
 
-      // Aggregate employee GA mix
-      const empMix = {}
+      // Aggregate employee data (GA mix and revenue)
+      const empData = {}
       employeeSales?.forEach(row => {
         const emp = row.employee || 'Não Identificado'
-        if (!empMix[emp]) {
-          empMix[emp] = { name: emp, volumeGA: 0, volumeGC: 0 }
+        if (!empData[emp]) {
+          empData[emp] = { name: emp, volumeGA: 0, volumeGC: 0, revenue: 0 }
         }
         const vol = parseFloat(row.volume || 0)
-        if (row.product_code === 'GA') empMix[emp].volumeGA += vol
-        if (row.product_code === 'GC') empMix[emp].volumeGC += vol
+        const val = parseFloat(row.value || 0)
+        empData[emp].revenue += val
+        if (row.product_code === 'GA') empData[emp].volumeGA += vol
+        if (row.product_code === 'GC') empData[emp].volumeGC += vol
       })
 
-      const employeeGAMix = Object.values(empMix)
+      const employeeGAMix = Object.values(empData)
         .map(e => ({
           ...e,
           totalGasoline: e.volumeGA + e.volumeGC,
@@ -724,6 +725,76 @@ const Home = ({ onNavigateToTab }) => {
                     <span className="me-2">✓</span>
                     <small>Nenhum alerta - tudo funcionando normalmente!</small>
                   </Alert>
+                </div>
+              )}
+
+              {/* Employee Rankings */}
+              {insightsData.employeeGAMix.length >= 3 && (
+                <div className="mt-3 pt-3 border-top">
+                  <h6 className="text-muted mb-3">Ranking Frentistas (7 dias)</h6>
+                  <Row>
+                    {/* Top 3 Employees */}
+                    <Col md={6} className="mb-3">
+                      <Card className="h-100 border-success">
+                        <Card.Header className="bg-success text-white py-2">
+                          <strong>Top 3 Frentistas</strong>
+                        </Card.Header>
+                        <Card.Body className="p-2">
+                          <Table size="sm" className="mb-0">
+                            <thead>
+                              <tr>
+                                <th>#</th>
+                                <th>Nome</th>
+                                <th>Faturamento</th>
+                                <th>Mix GA</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {insightsData.employeeGAMix.slice(0, 3).map((emp, idx) => (
+                                <tr key={emp.name}>
+                                  <td><Badge bg="success">{idx + 1}</Badge></td>
+                                  <td><strong>{emp.name}</strong></td>
+                                  <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(emp.revenue)}</td>
+                                  <td><Badge bg={emp.mixGA >= 20 ? 'success' : 'warning'}>{emp.mixGA.toFixed(1)}%</Badge></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </Table>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+
+                    {/* Bottom 3 Employees */}
+                    <Col md={6} className="mb-3">
+                      <Card className="h-100 border-danger">
+                        <Card.Header className="bg-danger text-white py-2">
+                          <strong>Bottom 3 Frentistas</strong>
+                        </Card.Header>
+                        <Card.Body className="p-2">
+                          <Table size="sm" className="mb-0">
+                            <thead>
+                              <tr>
+                                <th>#</th>
+                                <th>Nome</th>
+                                <th>Faturamento</th>
+                                <th>Mix GA</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {insightsData.employeeGAMix.slice(-3).reverse().map((emp, idx) => (
+                                <tr key={emp.name}>
+                                  <td><Badge bg="danger">{insightsData.employeeGAMix.length - 2 + idx}</Badge></td>
+                                  <td><strong>{emp.name}</strong></td>
+                                  <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(emp.revenue)}</td>
+                                  <td><Badge bg={emp.mixGA >= 20 ? 'success' : 'danger'}>{emp.mixGA.toFixed(1)}%</Badge></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </Table>
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                  </Row>
                 </div>
               )}
             </Card.Body>
