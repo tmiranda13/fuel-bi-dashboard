@@ -51,9 +51,21 @@ const Home = ({ onNavigateToTab }) => {
         const vmd = daysElapsed > 0 ? totalVolume / daysElapsed : 0
         const projected = Math.round(vmd * daysInMonth)
 
+        // Fetch monthly target from kpis table
+        const { data: kpiData } = await supabase
+          .from('kpis')
+          .select('target_value')
+          .eq('company_id', 2)
+          .eq('kpi_type', 'sales_volume')
+          .is('product_code', null)
+          .single()
+
+        const monthlyTarget = kpiData?.target_value ? parseFloat(kpiData.target_value) : null
+
         setCurrentMonthData({
           vmd: Math.round(vmd),
           projected,
+          monthlyTarget,
           daysElapsed,
           daysInMonth,
           monthName: new Date(year, month).toLocaleDateString('pt-BR', { month: 'long' }),
@@ -619,7 +631,12 @@ const Home = ({ onNavigateToTab }) => {
                           />
                           <div className="mt-1 p-2 bg-primary bg-opacity-10 rounded">
                             <small className="text-muted">Projeção: </small>
-                            <strong className="text-primary fs-6">{currentMonthData.projected.toLocaleString('pt-BR')} L</strong>
+                            <strong className="text-primary fs-6">
+                              {currentMonthData.projected.toLocaleString('pt-BR')} L
+                              {currentMonthData.monthlyTarget && (
+                                <span className="text-muted fw-normal"> / {currentMonthData.monthlyTarget.toLocaleString('pt-BR')} L</span>
+                              )}
+                            </strong>
                           </div>
                         </>
                       ) : (
