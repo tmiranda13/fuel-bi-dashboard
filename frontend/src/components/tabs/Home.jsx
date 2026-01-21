@@ -159,8 +159,8 @@ const Home = ({ onNavigateToTab }) => {
           totalGasoline: e.volumeGA + e.volumeGC,
           mixGA: (e.volumeGA + e.volumeGC) > 0 ? (e.volumeGA / (e.volumeGA + e.volumeGC)) * 100 : 0
         }))
-        .filter(e => e.totalGasoline > 500) // Only employees with significant gasoline sales
-        .sort((a, b) => b.mixGA - a.mixGA)
+        .filter(e => e.revenue > 0) // Only employees with sales
+        .sort((a, b) => b.revenue - a.revenue)
 
       // Build alerts array
       const alerts = []
