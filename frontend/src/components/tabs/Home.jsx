@@ -536,7 +536,6 @@ const Home = ({ onNavigateToTab }) => {
       <div className="mb-4 d-flex justify-content-between align-items-center">
         <div>
           <h2>Home</h2>
-          <small className="text-muted">Seus widgets favoritos em um só lugar</small>
         </div>
         <div>
           <Button variant="outline-primary" size="sm" className="me-2" onClick={() => setShowAddModal(true)}>
