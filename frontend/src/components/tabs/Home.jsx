@@ -97,6 +97,14 @@ const Home = ({ onNavigateToTab }) => {
     fetchData()
   }, [])
 
+  // Helper to format date as YYYY-MM-DD in local timezone
+  const formatDateLocal = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   // Fetch insights data
   const fetchInsightsData = async (estoqueDataParam) => {
     try {
@@ -105,27 +113,27 @@ const Home = ({ onNavigateToTab }) => {
       // Calculate dates
       const yesterday = new Date(now)
       yesterday.setDate(yesterday.getDate() - 1)
-      const yesterdayStr = yesterday.toISOString().split('T')[0]
+      const yesterdayStr = formatDateLocal(yesterday)
 
       const lastWeekSameDay = new Date(now)
       lastWeekSameDay.setDate(lastWeekSameDay.getDate() - 8) // Same day last week (yesterday - 7)
-      const lastWeekSameDayStr = lastWeekSameDay.toISOString().split('T')[0]
+      const lastWeekSameDayStr = formatDateLocal(lastWeekSameDay)
 
       // This week (Monday to yesterday)
       const thisWeekStart = new Date(now)
       const dayOfWeek = thisWeekStart.getDay() // 0=Sunday, 1=Monday, etc.
       const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
       thisWeekStart.setDate(thisWeekStart.getDate() - daysToMonday) // Monday of this week
-      const thisWeekStartStr = thisWeekStart.toISOString().split('T')[0]
+      const thisWeekStartStr = formatDateLocal(thisWeekStart)
 
       // Last week (same days as this week for fair comparison)
       // Monday of last week to same day of week as yesterday
       const lastWeekStart = new Date(thisWeekStart)
       lastWeekStart.setDate(lastWeekStart.getDate() - 7) // Monday of last week
-      const lastWeekStartStr = lastWeekStart.toISOString().split('T')[0]
+      const lastWeekStartStr = formatDateLocal(lastWeekStart)
       const lastWeekEnd = new Date(yesterday)
       lastWeekEnd.setDate(lastWeekEnd.getDate() - 7) // Same day last week as yesterday
-      const lastWeekEndStr = lastWeekEnd.toISOString().split('T')[0]
+      const lastWeekEndStr = formatDateLocal(lastWeekEnd)
 
       // Fetch yesterday's data
       const yesterdayData = await fetchVendasDashboard(yesterdayStr, yesterdayStr)
