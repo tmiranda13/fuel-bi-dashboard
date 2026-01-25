@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rede Vargas - Analise Mobile</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+            --bg-secondary: rgba(255,255,255,0.03);
+            --bg-card: rgba(0,0,0,0.2);
+            --text-primary: #fff;
+            --text-secondary: #888;
+            --text-muted: #666;
+            --border-color: rgba(255,255,255,0.08);
+            --table-hover: rgba(255,255,255,0.03);
+        }
+        body.light-mode {
+            --bg-primary: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            --bg-secondary: rgba(0,0,0,0.03);
+            --bg-card: rgba(0,0,0,0.05);
+            --text-primary: #1a1a2e;
+            --text-secondary: #555;
+            --text-muted: #777;
+            --border-color: rgba(0,0,0,0.1);
+            --table-hover: rgba(0,0,0,0.03);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: var(--text-primary);
+            padding: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .dashboard { max-width: 100%; margin: 0 auto; }
+        .header {
+            text-align: center;
+            padding: 15px 10px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 15px;
+        }
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .theme-toggle {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 8px 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            touch-action: manipulation;
+        }
+        .expand-all {
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            border: none;
+            border-radius: 20px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: white;
+            touch-action: manipulation;
+        }
+        .header h1 {
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf, #ff4757);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header p { font-size: 0.75rem; color: var(--text-secondary); }
+
+        /* Quick Stats Row */
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .quick-stat {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 12px 8px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+        .quick-stat .value { font-size: 1.1rem; font-weight: bold; }
+        .quick-stat .label { font-size: 0.65rem; color: var(--text-secondary); margin-top: 2px; }
+        .quick-stat.positive .value { color: #2ed573; }
+        .quick-stat.negative .value { color: #ff4757; }
+        .quick-stat.warning .value { color: #ffa502; }
+        .quick-stat.info .value { color: #00d4ff; }
+
+        /* Collapsible Sections */
+        .section {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            cursor: pointer;
+            touch-action: manipulation;
+            gap: 10px;
+        }
+        .section-header:active { background: var(--bg-card); }
+        .section-number {
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            color: white;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .section-title {
+            flex: 1;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .section-toggle {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            transition: transform 0.3s;
+        }
+        .section.collapsed .section-toggle { transform: rotate(-90deg); }
+        .section-content {
+            padding: 0 12px 12px;
+            max-height: 2000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+        .section.collapsed .section-content {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        /* Charts */
+        .chart-container {
+            position: relative;
+            height: 220px;
+            margin: 10px 0;
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .chart-container.tall { height: 280px; }
+        .chart-label {
+            font-size: 0.8rem;
+            color: #00d4ff;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        /* Tables */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: var(--bg-card);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.75rem;
+            min-width: 500px;
+        }
+        th, td {
+            padding: 8px 6px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+        }
+        th {
+            background: var(--bg-card);
+            color: #00d4ff;
+            font-weight: 600;
+            font-size: 0.7rem;
+            position: sticky;
+            top: 0;
+        }
+        td:first-child, th:first-child {
+            position: sticky;
+            left: 0;
+            background: var(--bg-card);
+            z-index: 1;
+        }
+
+        /* Colors */
+        .positive { color: #2ed573; }
+        .negative { color: #ff4757; }
+        .warning { color: #ffa502; }
+
+        /* Badges */
+        .badge {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 600;
+        }
+        .badge.danger { background: #ff4757; }
+        .badge.warning { background: #ffa502; color: #000; }
+        .badge.success { background: #2ed573; }
+        .badge.info { background: #00d4ff; color: #000; }
+
+        /* Insight Boxes */
+        .insight-box {
+            background: rgba(255,165,2,0.1);
+            border-left: 3px solid #ffa502;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.8rem;
+        }
+        .insight-box.danger { background: rgba(255,71,87,0.1); border-left-color: #ff4757; }
+        .insight-box.success { background: rgba(46,213,115,0.1); border-left-color: #2ed573; }
+        .insight-box h5 {
+            color: #ffa502;
+            margin-bottom: 5px;
+            font-size: 0.8rem;
+        }
+        .insight-box.danger h5 { color: #ff4757; }
+        .insight-box.success h5 { color: #2ed573; }
+        .insight-box p { color: var(--text-secondary); line-height: 1.4; }
+
+        /* Station Cards */
+        .station-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .station-card {
+            padding: 10px 8px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .station-card.inconfidencia { background: rgba(46,213,115,0.15); border: 1px solid #2ed573; }
+        .station-card.barra { background: rgba(0,212,255,0.15); border: 1px solid #00d4ff; }
+        .station-card.bela { background: rgba(123,44,191,0.15); border: 1px solid #7b2cbf; }
+        .station-card.franco { background: rgba(255,71,87,0.15); border: 1px solid #ff4757; }
+        .station-card .name { font-weight: bold; font-size: 0.7rem; margin-bottom: 4px; }
+        .station-card .value { font-size: 1rem; font-weight: bold; }
+        .station-card .detail { font-size: 0.65rem; color: var(--text-secondary); margin-top: 2px; }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px 10px;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+        }
+
+        /* Navigation FAB */
+        .nav-fab {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .nav-menu {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 10px 0;
+            display: none;
+            z-index: 999;
+            max-height: 60vh;
+            overflow-y: auto;
+            backdrop-filter: blur(10px);
+        }
+        .nav-menu.show { display: block; }
+        .nav-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-item:active { background: var(--bg-card); }
+        .nav-item .num {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00d4ff, #7b2cbf);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.65rem;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <div class="header-controls">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <span id="themeIcon">&#9790;</span>
+                    <span id="themeText">Claro</span>
+                </button>
+                <button class="expand-all" onclick="toggleAllSections()">
+                    <span id="expandText">Expandir</span>
+                </button>
+            </div>
+            <h1>Rede Vargas</h1>
+            <p>Jul-Dez 2025 | Analise Detalhada</p>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+            <div class="quick-stat positive">
+                <div class="value">R$ 78K</div>
+                <div class="label">Resultado Total Rede</div>
+            </div>
+            <div class="quick-stat info">
+                <div class="value">3.4M L</div>
+                <div class="label">Volume Vendido</div>
+            </div>
+            <div class="quick-stat positive">
+                <div class="value">R$ 378K</div>
+                <div class="label">Melhor: Inconfidencia</div>
+            </div>
+            <div class="quick-stat negative">
+                <div class="value">-R$ 465K</div>
+                <div class="label">Pior: Franco Suico</div>
+            </div>
+        </div>
+
+        <!-- 1. Resultado Final -->
+        <div class="section" id="section-1">
+            <div class="section-header" onclick="toggleSection('section-1')">
+                <span class="section-number">1</span>
+                <span class="section-title">Resultado Liquido</span>
+                <span class="section-toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="station-grid">
+                    <div class="station-card inconfidencia">
+                        <div class="name">Inconfidencia</div>
+                        <div class="value" style="color:#2ed573">R$ 377.834</div>
+                        <div class="detail">Margem: 5.24%</div>
+                    </div>
+                    <div class="station-card barra">
+                        <div class="name">Barra Vargas</div>
+                        <div class="value" style="color:#2ed573">R$ 111.622</div>
+                        <div class="detail">Margem: 3.67%</div>
+                    </div>
+                    <div class="station-card bela">
+                        <div class="name">Bela Vista</div>
+                        <div class="value" style="color:#ffa502">R$ 53.924</div>
+                        <div class="detail">Margem: 0.88%</div>
+                    </div>
+                    <div class="station-card franco">
+                        <div class="name">Franco Suico</div>
+                        <div class="value" style="color:#ff4757">-R$ 465.020</div>
+                        <div class="detail">Margem: -10.63%</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-label">Resultado em R$ (6 meses)</div>
+                    <canvas id="netResultChart"></canvas>
+                </div>
+                <div class="insight-box success">
+                    <h5>Resumo Executivo</h5>
+                    <p><strong>Inconfidencia</strong> e o posto modelo. <strong>Barra Vargas</strong> e pequeno mas eficiente. <strong>Bela Vista</strong> precisa reduzir custos. <strong>Franco Suico</strong> requer intervencao urgente.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Volume de Vendas -->
+        <div class="section collapsed" id="section-2">
+            <div class="section-header" onclick="toggleSection('section-2')">
+                <span class="section-number">2</span>
+                <span class="section-title">Vendas de Combustiveis</span>
+                <span class="section-toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="chart-container tall">
+                    <div class="chart-label">Volume por Produto (Litros)</div>
+                    <canvas id="fuelVolumeChart"></canvas>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>Posto</th><th>Diesel S10</th><th>Diesel S500</th><th>Etanol</th><th>Gas Adit</th><th>Gas Com</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td style="color:#2ed573">Inconfidencia</td><td>R$ 5.99</td><td>R$ 5.88</td><td>R$ 4.69</td><td>R$ 6.89</td><td>R$ 6.50</td></tr>
+                            <tr><td style="color:#00d4ff">Barra Vargas</td><td>R$ 5.99</td><td>-</td><td>R$ 4.68</td><td>R$ 6.88</td><td>R$ 6.48</td></tr>
+                            <tr><td style="color:#7b2cbf">Bela Vista</td><td>R$ 5.96</td><td>R$ 5.85</td><td>R$ 4.69</td><td>R$ 6.89</td><td>R$ 6.49</td></tr>
+                            <tr><td style="color:#ff4757">Franco Suico</td><td>R$ 5.99</td><td>R$ 5.87</td><td>R$ 4.68</td><td>R$ 6.88</td><td>R$ 6.48</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="insight-box success">
+                    <h5>Observacao</h5>
+                    <p>Precos unitarios consistentes entre postos. Bela Vista domina volume de diesel (59% da rede).</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Salarios -->
+        <div class="section collapsed" id="section-3">
+            <div class="section-header" onclick="toggleSection('section-3')">
+                <span class="section-number">3</span>
+                <span class="section-title">Salarios e Encargos</span>
+                <span class="section-toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="chart-container tall">
+                    <div class="chart-label">Composicao dos Custos de Pessoal</div>
+                    <canvas id="salaryChart"></canvas>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>Posto</th><th>Folha</th><th>INSS</th><th>FGTS</th><th>Total</th><th>ctv/L</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td style="color:#2ed573">Inconfidencia</td><td>R$ 168K</td><td>R$ 22K</td><td>R$ 16K</td><td>R$ 235K</td><td class="positive">23.07</td></tr>
+                            <tr><td style="color:#00d4ff">Barra Vargas</td><td>R$ 160K</td><td>R$ 38K</td><td>R$ 27K</td><td>R$ 192K</td><td>40.28</td></tr>
+                            <tr><td style="color:#7b2cbf">Bela Vista</td><td>R$ 226K</td><td>R$ 50K</td><td>R$ 29K</td><td>R$ 269K</td><td class="warning">64.64</td></tr>
+                            <tr><td style="color:#ff4757">Franco Suico</td><td>R$ 284K</td><td>R$ 60K</td><td class="negative">R$ 61K</td><td>R$ 316K</td><td class="negative">67.45</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="insight-box danger">
+                    <h5>ALERTA: Encargos</h5>
+                    <p><strong>Franco Suico tem FGTS anormalmente alto (R$ 60.923)</strong> - quase o dobro dos outros. Possivel acumulo de divida ou multas.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Despesas Bancarias -->
+        <div class="section collapsed" id="section-4">
+            <div class="section-header" onclick="toggleSection('section-4')">
+                <span class="section-number">4</span>
+                <span class="section-title">Despesas Bancarias</span>
+                <span class="section-toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="station-grid">
+                    <div class="station-card inconfidencia">
+                        <div class="name">Inconfidencia</div>
+                        <div class="value" style="color:#2ed573">R$ 15.504</div>
+                        <div class="detail">Menor da rede</div>
+                    </div>
+                    <div class="station-card barra">
+                        <div class="name">Barra Vargas</div>
+                        <div class="value">R$ 26.293</div>
+                        <div class="detail">Normal</div>
+                    </div>
+                    <div class="station-card bela">
+                        <div class="name">Bela Vista</div>
+                        <div class="value" style="color:#ffa502">R$ 100.947</div>
+                        <div class="detail">Elevada</div>
+                    </div>
+                    <div class="station-card franco">
+                        <div class="name">Franco Suico</div>
+                        <div class="value" style="color:#ff4757">R$ 452.355</div>
+                        <div class="detail">CRITICO!</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-label">Comparativo (R$)</div>
+                    <canvas id="bankExpensesChart"></canvas>
+                </div>
+                <div class="insight-box danger">
+                    <h5>CRITICO: Franco Suico</h5>
+                    <p>R$ 452K em despesas bancarias - 6x mais que a soma dos outros 3 postos. Investigar financiamentos, juros e multas.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Despesas Operacionais -->
+        <div class="section collapsed" id="section-5">
+            <div class="section-header" onclick="toggleSection('section-5')">
+                <span class="section-number">5</span>
+                <span class="section-title">Despesas Operacionais</span>
+                <span class="section-toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="chart-container tall">
+                    <div class="chart-label">Composicao das Despesas</div>
+                    <canvas id="opExpensesChart"></canvas>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr><th>Posto</th><th>Frete</th><th>Aluguel</th><th>Energia</th><th>Agua</th><th>Total</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td style="color:#2ed573">Inconfidencia</td><td>R$ 184K</td><td>R$ 50K</td><td>R$ 23K</td><td>R$ 1.3K</td><td>R$ 398K</td></tr>
+                            <tr><td style="color:#00d4ff">Barra Vargas</td><td>R$ 86K</td><td>R$ 20K</td><td>R$ 4.9K</td><td>R$ 3.2K</td><td>R$ 130K</td></tr>
+                            <tr><td style="color:#7b2cbf">Bela Vista</td><td>R$ 179K</td><td>R$ 40K</td><td>R$ 19K</td><td>R$ 1.0K</td><td>R$ 288K</td></tr>
+                            <tr><td style="color:#ff4757">Franco Suico</td><td>R$ 110K</td><td class="positive">R$ 0</td><td>R$ 10K</td><td>R$ 5.5K</td><td>R$ 233K</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="insight-box">
+                    <h5>Aluguel</h5>
+                    <p><strong>Franco Suico nao paga aluguel</strong> - imovel proprio. Recebe R$ 3.600/semestre de sublocacao.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. Frete -->
+        <div class="section collapsed" id="section-6">
+            <div class="section-header" onclick="toggleSection('section-6')">
+                <span class="section-number">6</span>
+                <span class="section-title">Eficiencia de Frete</span>
+                <span class="section-toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="station-grid">
+                    <div class="station-card franco">
+                        <div class="name" style="color:#2ed573">Franco Suico</div>
+                        <div class="value" style="color:#2ed573">15.38</div>
+                        <div class="detail">ctv/litro - Melhor</div>
+                    </div>
+                    <div class="station-card inconfidencia">
+                        <div class="name">Inconfidencia</div>
+                        <div class="value">15.57</div>
+                        <div class="detail">ctv/litro</div>
+                    </div>
+                    <div class="station-card barra">
+                        <div class="name">Barra Vargas</div>
+                        <div class="value">17.25</div>
+                        <div class="detail">ctv/litro</div>
+                    </div>
+                    <div class="station-card bela">
+                        <div class="name" style="color:#ff4757">Bela Vista</div>
+                        <div class="value" style="color:#ff4757">17.84</div>
+                        <div class="detail">ctv/litro - Pior</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-label">Custo de Frete por Posto (R$)</div>
+                    <canvas id="freightChart"></canvas>
+                </div>
+                <div class="insight-box success">
+                    <h5>Analise</h5>
+                    <p>Todos em faixa aceitavel (2.5% a 2.9% da receita). Franco Suico e mais eficiente apesar dos problemas financeiros.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. Perdas e Sobras -->
+        <div class="section collapsed" id="section-7">
+            <div class="section-header" onclick="toggleSection('section-7')">
+                <span class="section-number">7</span>
+                <span class="section-title">Perdas e Sobras</span>
+                <span class="section-toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="station-grid">
+                    <div class="station-card franco">
+                        <div class="name">Franco Suico</div>
+                        <div class="value">+R$ 8.648</div>
+                        <div class="detail">Sobra</div>
+                    </div>
+                    <div class="station-card barra">
+                        <div class="name">Barra Vargas</div>
+                        <div class="value">+R$ 7.285</div>
+                        <div class="detail">Sobra</div>
+                    </div>
+                    <div class="station-card inconfidencia">
+                        <div class="name">Inconfidencia</div>
+                        <div class="value">-R$ 3.121</div>
+                        <div class="detail">Perda aceitavel</div>
+                    </div>
+                    <div class="station-card bela">
+                        <div class="name">Bela Vista</div>
+                        <div class="value">-R$ 6.868</div>
+                        <div class="detail">Perda</div>
+                    </div>
+                </div>
+                <div class="insight-box">
+                    <h5>Interpretacao</h5>
+                    <p><strong>Sobras consistentes</strong> podem indicar bombas descalibradas. <strong>Perdas</strong> sao normais (evaporacao). Todos em faixa aceitavel (&lt;0.5% faturamento).</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. Metodologia -->
+        <div class="section collapsed" id="section-8">
+            <div class="section-header" onclick="toggleSection('section-8')">
+                <span class="section-number">?</span>
+                <span class="section-title">Metodologia</span>
+                <span class="section-toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="insight-box success">
+                    <h5>Lucro Bruto</h5>
+                    <p>"Total Lucro Bruto + Receitas" - inclui lucro operacional + outras receitas (ex: lucro de aplicacao)</p>
+                </div>
+                <div class="insight-box">
+                    <h5>Resultado Liquido</h5>
+                    <p>Inclui Perdas e Sobras (regime de competencia) - impactam estoque/CMV</p>
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Conceito</th><th>Descricao</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>Sobra (+)</strong></td><td>Estoque fisico > contabil (bombas descalibradas?)</td></tr>
+                            <tr><td><strong>Perda (-)</strong></td><td>Estoque fisico < contabil (evaporacao normal)</td></tr>
+                            <tr><td><strong>Aceitavel</strong></td><td>Ate 0.5% do faturamento</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Dashboard Mobile | Rede Vargas | Jul-Dez 2025</p>
+            <p style="margin-top:5px;">Metodologia: Lucro Bruto = Total Lucro Bruto + Receitas</p>
+        </div>
+    </div>
+
+    <!-- Navigation FAB -->
+    <button class="nav-fab" onclick="toggleNavMenu()">&#9776;</button>
+    <div class="nav-menu" id="navMenu">
+        <div class="nav-item" onclick="scrollToSection('section-1')"><span class="num">1</span> Resultado</div>
+        <div class="nav-item" onclick="scrollToSection('section-2')"><span class="num">2</span> Combustiveis</div>
+        <div class="nav-item" onclick="scrollToSection('section-3')"><span class="num">3</span> Salarios</div>
+        <div class="nav-item" onclick="scrollToSection('section-4')"><span class="num">4</span> Bancarias</div>
+        <div class="nav-item" onclick="scrollToSection('section-5')"><span class="num">5</span> Operacionais</div>
+        <div class="nav-item" onclick="scrollToSection('section-6')"><span class="num">6</span> Frete</div>
+        <div class="nav-item" onclick="scrollToSection('section-7')"><span class="num">7</span> Perdas</div>
+        <div class="nav-item" onclick="scrollToSection('section-8')"><span class="num">?</span> Metodologia</div>
+    </div>
+
+    <script>
+        // Theme toggle
+        let isDarkMode = true;
+        function toggleTheme() {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('light-mode');
+            document.getElementById('themeIcon').innerHTML = isDarkMode ? '&#9790;' : '&#9728;';
+            document.getElementById('themeText').textContent = isDarkMode ? 'Claro' : 'Escuro';
+            updateChartsTheme();
+        }
+
+        function getChartTextColor() { return isDarkMode ? '#fff' : '#333'; }
+        function getChartGridColor() { return isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)'; }
+        function getChartTickColor() { return isDarkMode ? '#888' : '#555'; }
+
+        function updateChartsTheme() {
+            Chart.helpers.each(Chart.instances, function(chart) {
+                if (chart.options.scales) {
+                    if (chart.options.scales.x) {
+                        chart.options.scales.x.ticks.color = getChartTickColor();
+                        chart.options.scales.x.grid.color = getChartGridColor();
+                    }
+                    if (chart.options.scales.y) {
+                        chart.options.scales.y.ticks.color = getChartTickColor();
+                        if (chart.options.scales.y.grid) chart.options.scales.y.grid.color = getChartGridColor();
+                    }
+                }
+                if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+                    chart.options.plugins.legend.labels.color = getChartTextColor();
+                }
+                chart.update();
+            });
+        }
+
+        // Section toggle
+        function toggleSection(id) {
+            document.getElementById(id).classList.toggle('collapsed');
+        }
+
+        let allExpanded = false;
+        function toggleAllSections() {
+            allExpanded = !allExpanded;
+            document.querySelectorAll('.section').forEach(s => {
+                if (allExpanded) s.classList.remove('collapsed');
+                else if (s.id !== 'section-1') s.classList.add('collapsed');
+            });
+            document.getElementById('expandText').textContent = allExpanded ? 'Recolher' : 'Expandir';
+        }
+
+        // Navigation
+        function toggleNavMenu() {
+            document.getElementById('navMenu').classList.toggle('show');
+        }
+
+        function scrollToSection(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('collapsed');
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById('navMenu').classList.remove('show');
+        }
+
+        // Close nav menu when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.nav-fab') && !e.target.closest('.nav-menu')) {
+                document.getElementById('navMenu').classList.remove('show');
+            }
+        });
+
+        // Chart configuration
+        const colors = {
+            'Inconfidencia': '#2ed573',
+            'Barra Vargas': '#00d4ff',
+            'Bela Vista': '#7b2cbf',
+            'Franco Suico': '#ff4757'
+        };
+        const stations = ['Inconfidencia', 'Barra Vargas', 'Bela Vista', 'Franco Suico'];
+        const stationColors = stations.map(s => colors[s]);
+
+        const mobileOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: '#fff', font: { size: 10 }, boxWidth: 12, padding: 8 },
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#888', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            }
+        };
+
+        // 1. Net Result Chart
+        new Chart(document.getElementById('netResultChart'), {
+            type: 'bar',
+            data: {
+                labels: stations,
+                datasets: [{
+                    label: 'Resultado (R$)',
+                    data: [377834, 111622, 53924, -465020],
+                    backgroundColor: [377834 > 0 ? '#2ed573' : '#ff4757', '#2ed573', '#ffa502', '#ff4757'],
+                    borderRadius: 6
+                }]
+            },
+            options: { ...mobileOptions, plugins: { legend: { display: false } } }
+        });
+
+        // 2. Fuel Volume Chart
+        new Chart(document.getElementById('fuelVolumeChart'), {
+            type: 'bar',
+            data: {
+                labels: stations,
+                datasets: [
+                    { label: 'Diesel S10', data: [87178, 22902, 424844, 178432], backgroundColor: '#e74c3c' },
+                    { label: 'Diesel S500', data: [76381, 0, 164758, 65212], backgroundColor: '#c0392b' },
+                    { label: 'Etanol', data: [311759, 138370, 112053, 124182], backgroundColor: '#ffa502' },
+                    { label: 'Gas. Aditiv', data: [443029, 110201, 189188, 207409], backgroundColor: '#00d4ff' },
+                    { label: 'Gas. Comum', data: [265271, 228213, 114345, 137131], backgroundColor: '#2ed573' }
+                ]
+            },
+            options: mobileOptions
+        });
+
+        // 3. Salary Chart
+        new Chart(document.getElementById('salaryChart'), {
+            type: 'bar',
+            data: {
+                labels: stations,
+                datasets: [
+                    { label: 'Folha', data: [168480, 159752, 226235, 283548], backgroundColor: '#00d4ff' },
+                    { label: 'INSS', data: [22264, 38352, 50397, 59526], backgroundColor: '#7b2cbf' },
+                    { label: 'FGTS', data: [16151, 27003, 28502, 60923], backgroundColor: '#ffa502' },
+                    { label: 'Outros', data: [6919, 17744, 21943, 18675], backgroundColor: '#2ed573' }
+                ]
+            },
+            options: {
+                ...mobileOptions,
+                scales: {
+                    x: { ...mobileOptions.scales.x, stacked: true },
+                    y: { ...mobileOptions.scales.y, stacked: true }
+                }
+            }
+        });
+
+        // 4. Bank Expenses Chart
+        new Chart(document.getElementById('bankExpensesChart'), {
+            type: 'bar',
+            data: {
+                labels: stations,
+                datasets: [{
+                    label: 'Despesas Bancarias (R$)',
+                    data: [15504, 26293, 100947, 452355],
+                    backgroundColor: stationColors,
+                    borderRadius: 6
+                }]
+            },
+            options: { ...mobileOptions, plugins: { legend: { display: false } } }
+        });
+
+        // 5. Operational Expenses Chart
+        new Chart(document.getElementById('opExpensesChart'), {
+            type: 'bar',
+            data: {
+                labels: stations,
+                datasets: [
+                    { label: 'Frete', data: [184320, 86220, 179280, 109560], backgroundColor: '#00d4ff' },
+                    { label: 'Aluguel', data: [50000, 20000, 40000, 0], backgroundColor: '#7b2cbf' },
+                    { label: 'Energia', data: [22969, 4876, 19286, 10410], backgroundColor: '#ffa502' },
+                    { label: 'Outros', data: [30318, 16833, 2521, 111268], backgroundColor: '#2ed573' }
+                ]
+            },
+            options: mobileOptions
+        });
+
+        // 6. Freight Chart
+        new Chart(document.getElementById('freightChart'), {
+            type: 'bar',
+            data: {
+                labels: stations,
+                datasets: [{
+                    label: 'Frete (R$)',
+                    data: [184320, 86220, 179280, 109560],
+                    backgroundColor: stationColors,
+                    borderRadius: 6
+                }]
+            },
+            options: { ...mobileOptions, plugins: { legend: { display: false } } }
+        });
+    </script>
+</body>
+</html>
